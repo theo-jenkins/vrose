@@ -1,5 +1,5 @@
 import React from "react";
-import Register from "../components/authentication/Register";
+import Register from "../../components/authentication/Register";
 import "../../styles/authentication/register-page.css";
 
 const RegisterPage = () => {
