@@ -1,0 +1,12 @@
+# Byte-compiled Python files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+env/
+.env
+
+# Migrations
+*/migrations/*.py
+!*/migrations/__init__.py
