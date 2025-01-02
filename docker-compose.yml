@@ -1,8 +1,8 @@
 services:
   backend:
     build:
-      context: .  # Context is the project root
-      dockerfile: backend/Dockerfile
+      context: .
+      dockerfile: /backend/Dockerfile
     container_name: django-backend
     command: python manage.py runserver 0.0.0.0:8000
     ports:
@@ -22,7 +22,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: frontend/Dockerfile
+      dockerfile: /frontend/Dockerfile
     container_name: react-frontend
     ports:
       - "3000:3000"
