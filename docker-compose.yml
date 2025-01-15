@@ -8,16 +8,15 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app/backend
-      - ./manage.py:/app/manage.py
-      - ./api:/app/api
+      - .:/app:cached # Mount the entire project directory
     env_file:
       - .env
     depends_on:
       - db
     environment:
     - DJANGO_SETTINGS_MODULE=backend.settings
-
+    labels:
+      com.docker.compose.watch: 'true'
 
   frontend:
     build:
@@ -28,10 +27,11 @@ services:
       - "3000:3000"
     stdin_open: true
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - ./frontend:/app:cached
     environment:
       - CHOKIDAR_USEPOLLING=true
+    labels:
+      com.docker.compose.watch: 'true'
 
   db:
     image: postgres:13
