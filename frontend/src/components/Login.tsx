@@ -3,7 +3,7 @@ import React from 'react';
 const Login: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#191516]">
-      <div className="w-full max-w-md bg-[#191516] text-[#F6D3E4] rounded-lg shadow-md p-8 shadow-md hover:shadow-[0_4px_10px_#F6D3E4] transition-shadow duration-300">
+      <div className="w-full max-w-md bg-[#191516] text-[#F6D3E4] rounded-lg p-8 hover:shadow-[0_0_10px_#F6D3E4] transition-shadow duration-300">
         <h2 className="text-3xl font-semibold text-center mb-6">Sign In</h2>
         <form className="space-y-6">
           {/* Email Field */}
