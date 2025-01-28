@@ -8,15 +8,34 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - .:/app:cached # Mount the entire project directory
+    #  - ./backend:/app/backend:cached  # Mount the backend code
+    #  - ./api:/app/api:cached          # Mount the api code
+    #  - ./manage.py:/app/manage.py     # Include manage.py
+    #  - ./requirements.txt:/app/requirements.txt  # Include requirements file
     env_file:
       - .env
     depends_on:
       - db
     environment:
     - DJANGO_SETTINGS_MODULE=backend.settings
-    labels:
-      com.docker.compose.watch: 'true'
+    - DOCKER_ENV=true
+    - DOCKER_DATABASE_HOST=db
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./backend
+          target: /app/backend
+          ignore:
+            - "*.pyc"
+            - "__pycache__"
+        - action: sync+restart
+          path: ./api
+          target: /app/api
+          ignore:
+            - "*.pyc"
+            - "__pycache__"
+        - action: rebuild
+          path: requirements.txt
 
   frontend:
     build:
@@ -27,14 +46,22 @@ services:
       - "3000:3000"
     stdin_open: true
     volumes:
-      - ./frontend:/app:cached
+    #  - ./frontend:/app:cached
     environment:
       - CHOKIDAR_USEPOLLING=true
-    labels:
-      com.docker.compose.watch: 'true'
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./frontend
+          target: /app
+          ignore:
+            - "node_modules/"
+        - action: rebuild
+          path: package.json
 
   db:
     image: postgres:13
+    container_name: django-db
     environment:
       POSTGRES_DB: ${DATABASE_NAME}
       POSTGRES_USER: ${DATABASE_USER}
