@@ -2,8 +2,8 @@ import React from 'react';
 
 const WelcomeMessage = () => {
     return (
-        <div className="flex items-center justify-center min-h-screen bg-[#191516]">
-            <div className="bg-[#191516] text-[#F6D3E4] rounded-lg p-8 flex flex-col items-center">
+        <div className="flex-grow flex items-center justify-center rounded-md bg-light-background dark:bg-dark-background px-8 shadow-lg">
+            <div className="w-full max-w-4xl text-light-text dark:text-dark-text rounded-2xl p-8 flex flex-col items-center">
                 {/* Static Image */}
                 <img
                     src="/static/images/vrose-logo.svg"
@@ -13,7 +13,7 @@ const WelcomeMessage = () => {
 
                 {/* Welcome Text */}
                 <h1 className="text-3xl font-semibold text-center">
-                    Welcome to Vrose
+                    Welcome to VROSE
                 </h1>
             </div>
         </div>

@@ -16,30 +16,29 @@ const ThemeSwitcher = () => {
   const toggleTheme = () => {
     setClicked(true); // Set clicked to true on button click
     const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
+
+    // Toggle dark mode
     document.documentElement.classList.toggle("dark", newTheme === "dark");
+
+    // Apply state change after updating the document class
+    setTheme(newTheme);
     localStorage.setItem("theme", newTheme);
-    setTimeout(() => setClicked(false), 600); // Reset clicked after animation duration
+
+    // Reset clicked after animation duration
+    setTimeout(() => setClicked(false), 600);
   };
 
   return (
     <button
       onClick={toggleTheme}
-      className="flex items-center justify-center w-12 h-12 bg-gray-200 dark:bg-gray-800 rounded-full shadow-md hover:scale-110 transition-transform duration-300"
+      className={`flex items-center justify-center w-10 h-10 rounded-full shadow-md hover:scale-110 transition-transform duration-300 
+      ${theme === "light" ? "bg-light-button text-light-button-text" : "bg-dark-button text-dark-button-text"}`}
       aria-label="Toggle Theme"
     >
       {theme === "light" ? (
-        <MoonIcon
-          className={`w-6 h-6 text-gray-800 ${
-            clicked ? "animate-spinEase" : ""
-          }`}
-        />
+        <MoonIcon className={`w-6 h-6 text-dark-button ${clicked ? "animate-spinEase" : ""}`} />
       ) : (
-        <SunIcon
-          className={`w-6 h-6 text-yellow-400 ${
-            clicked ? "animate-spinEase" : ""
-          }`}
-        />
+        <SunIcon className={`w-6 h-6 text-light-button ${clicked ? "animate-spinEase" : ""}`} />
       )}
     </button>
   );

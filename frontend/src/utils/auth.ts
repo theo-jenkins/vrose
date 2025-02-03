@@ -66,3 +66,14 @@ export const fetchCsrfToken = async () => {
       console.error('Failed to fetch CSRF token:', err);
     }
   };
+
+// Fetches user details from the backend
+export const fetchUserDetails = async () => {
+    try {
+        const response = await api.get('/user-details/');
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching user details:', error);
+        return null;
+    }
+};

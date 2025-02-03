@@ -22,8 +22,8 @@ export default {
       colors: {
         light: {
           background: '#fbeff2',
-          text: '#8a0b6f',
-          button: '#f5dbe8',
+          text: '#191516',
+          button: '#191516',
           accent: '#8a0b6f',
           'button-text': '#8a0b6f',
           'form-field': '#ffffff',
