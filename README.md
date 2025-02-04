@@ -1,26 +1,31 @@
 To do:
-- Add a key word admin portal :heavy_check_mark:
-- Add form validation with CSRF protection :heavy_check_mark:
-- Implement access and refresh token issuance :heavy_check_mark:
+- Add a key word admin portal :white_check_mark:
+- Add form validation with CSRF protection :white_check_mark:
+- Implement access and refresh token issuance :white_check_mark:
 - Fix the '/' page to look better
-- Fix the logout api :heavy_check_mark:
-- Move auth bar to nav bar
+- Fix the logout api :white_check_mark:
+- Move auth bar to nav bar to top bar (idfk anymore) :white_check_mark:
 - Add a vrose logo
 - Add a welcome message
-- Add a theme switcher :heavy_check_mark:
+- Add a theme switcher :white_check_mark:
 - Configure a color scheme on all components
-- Change nav bar to top horizontal bar (Logo, Features, Pricing, Support, Theme Switcher, Login, Sign Up)
+- Change nav bar to top horizontal bar (Logo, Features, Pricing, Support, Theme Switcher, Login, Sign Up) :white_check_mark:
 - Add a feature list
 - Add a pricing page
 - Add a support page
 - Implement feature bar as a something else
-- Fix login as auto filling the fields but returning 400 error detecting empty form fields
+- Fix login as auto filling the fields but returning 400 error detecting empty form fields :white_check_mark:
 - Change sign up to no longer use keyword
-- Add TopBar to signup and login pages.
-- Add redux state manager to save user auth and preferences
+- Add TopBar to signup and login pages. :white_check_mark:
+- Add redux state manager to save user auth and preferences :white_check_mark:
+- Change font (Neue Montreal would be nice)
+- Change imports to relative imports
+- Fix tree hydration error :white_check_mark:
+- Add CSRF token to redux store
 
 Design Choices:
 - Buttons should be outlined and rounded by default
 - Buttons should expand on hover
 - Links should highlight on hover
 - Links should bolded on hover?
+- Dashboard link should have chevron

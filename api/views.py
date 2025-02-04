@@ -9,7 +9,7 @@ from django.http import JsonResponse
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
-from .serializers import SignUpSerializer
+from .serializers import SignUpSerializer, CustomTokenObtainPairSerializer
 
 
 # API endpoint for fetching CSRF token
@@ -22,24 +22,30 @@ def get_csrf_token(request):
 @method_decorator(csrf_protect, name='dispatch')
 class SignUpView(APIView):
     permission_classes = [AllowAny]
-
     def post(self, request):
         # Passes the form data to the serializer
         serializer = SignUpSerializer(data=request.data)
         # Attempts to validate the serializer then saves the user
         if serializer.is_valid():
-            user =serializer.save()
+            user=serializer.save()
 
             # Generate a new refresh token for the user
             refresh = RefreshToken.for_user(user)
-            access_token = str(refresh.access_token)
+            data = {
+                "user": {
+                    "id": user.id,
+                    "email": user.email
+                },
+                "refresh": str(refresh),
+                "access": str(refresh.access_token),
+            }
 
             # Set tokens in cookies
-            response = Response({"success": True, "message": "Login successful"})
+            response = Response(data, status=status.HTTP_201_CREATED)
 
             response.set_cookie(
                 key='access_token',
-                value=access_token,
+                value=str(refresh.access_token),
                 httponly=True,
                 secure=False,  # Use True for production
                 samesite='Lax'
@@ -58,6 +64,7 @@ class SignUpView(APIView):
 # API endpoint for user login (token issuance)
 @method_decorator(csrf_protect, name='dispatch')
 class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
         
@@ -90,11 +97,6 @@ class LogoutView(APIView):
 
     def post(self, request):
         try:
-            # debugging
-            print("Authorization Header:", request.headers.get('Authorization'))
-            print("Cookies:", request.COOKIES)
-            print("User:", request.user)
-
             # Extract the refresh token from the cookies
             refresh_token = request.COOKIES.get('refresh_token')
             if not refresh_token:
@@ -134,6 +136,7 @@ class UserDetailsView(APIView):
         user = request.user
         permissions = user.get_all_permissions()
         response = {
+            "id": user.id,
             "email": user.email,
             "permissions": list(permissions)
         }

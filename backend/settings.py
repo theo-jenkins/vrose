@@ -70,8 +70,8 @@ SIMPLE_JWT = {
     'AUTH_COOKIE_HTTP_ONLY': True,
     'AUTH_COOKIE_SAMESITE': 'Lax',
     'AUTH_COOKIE_SECURE': False,  # Set to True in production with HTTPS
-    'USER_ID_FIELD': 'user_id',  # Use the primary key field from your CustomUser model
-    'USER_ID_CLAIM': 'user_id',  # What the token will include
+    'USER_ID_FIELD': 'id',  # Use the primary key field from your CustomUser model
+    'USER_ID_CLAIM': 'id',  # What the token will include
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,

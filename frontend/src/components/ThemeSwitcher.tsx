@@ -1,37 +1,37 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState } from "../../redux/store";
+import { setTheme } from "../../redux/slices/preferencesSlice";
 import { SunIcon, MoonIcon } from "@heroicons/react/24/outline";
 
 const ThemeSwitcher = () => {
-  const [theme, setTheme] = useState("light");
-  const [clicked, setClicked] = useState(false); // Track if the button was clicked
+  const [mounted, setMounted] = useState(false); // Ensure hydration consistency
+  const [clicked, setClicked] = useState(false); // For animation trigger
+  const dispatch = useDispatch();
+  const theme = useSelector((state: RootState) => state.preferences.theme);
 
-  // Load saved theme from localStorage
+  // Set theme only after hydration
   useEffect(() => {
-    const storedTheme = localStorage.getItem("theme") || "light";
-    setTheme(storedTheme);
-    document.documentElement.classList.toggle("dark", storedTheme === "dark");
-  }, []);
+    setMounted(true);
+    document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
 
-  // Toggle theme and update localStorage
+  // Toggle theme
   const toggleTheme = () => {
-    setClicked(true); // Set clicked to true on button click
+    setClicked(true);
     const newTheme = theme === "light" ? "dark" : "light";
-
-    // Toggle dark mode
-    document.documentElement.classList.toggle("dark", newTheme === "dark");
-
-    // Apply state change after updating the document class
-    setTheme(newTheme);
-    localStorage.setItem("theme", newTheme);
-
-    // Reset clicked after animation duration
-    setTimeout(() => setClicked(false), 600);
+    dispatch(setTheme(newTheme)); // Redux updates localStorage
+    setTimeout(() => setClicked(false), 600); // Reset animation
   };
+
+  // Prevent rendering on the server (fixes hydration mismatch)
+  if (!mounted) return null;
 
   return (
     <button
       onClick={toggleTheme}
-      className={`flex items-center justify-center w-10 h-10 rounded-full shadow-md hover:scale-110 transition-transform duration-300 
+      className={`flex items-center justify-center w-10 h-10 rounded-full shadow-md hover:scale-110 transition-transform duration-300
       ${theme === "light" ? "bg-light-button text-light-button-text" : "bg-dark-button text-dark-button-text"}`}
       aria-label="Toggle Theme"
     >

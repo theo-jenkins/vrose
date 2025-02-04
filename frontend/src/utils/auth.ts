@@ -1,79 +1,82 @@
-import api from '../services/api';
+import api from "../services/api";
+import { AppDispatch } from "../../redux/store";
+import { loginSuccess, logoutSuccess } from "../../redux/slices/authSlice";
 
-// Sends sign up request and redirects to users home page
+// Sign up function
 export const handleSignUp = async (
-    formData: {
-      email: string;
-      keyWord: string;
-      password: string;
-      confirmPassword: string;
-    },
-    setErrors: (errors: Record<string, string>) => void,
-    router: any,
-    setIsSubmitting: (isSubmitting: boolean) => void
-  ) => {
-    setIsSubmitting(true);
-  
-    try {
-      const response = await api.post('/signup/', {
-        email: formData.email,
-        key_word: formData.keyWord,
-        password: formData.password,
-        confirm_password: formData.confirmPassword,
+  formData: { email: string; keyWord: string; password: string; confirm_password: string },
+  setErrors: (errors: Record<string, string>) => void,
+  router: any,
+  setIsSubmitting: (isSubmitting: boolean) => void,
+  dispatch: AppDispatch // Redux dispatch
+) => {
+  setIsSubmitting(true);
+
+  // Signup attempt
+  try {
+    const response = await api.post("/signup/", formData);
+    if (response.status === 201) {
+      console.log("Sign up successful:", response.data);
+      dispatch(loginSuccess({
+        id: response.data.user.id,
+        email: response.data.user.email
+      }));
+      router.push("/home"); // Redirect to home
+    }
+  } catch (error: any) {
+    if (error.response?.data?.errors) {
+      setErrors({
+        email: error.response.data.errors?.email?.[0] || "",
+        keyWord: error.response.data.errors?.key_word?.[0] || "",
+        password: error.response.data.errors?.password?.[0] || "",
+        confirm_password: error.response.data.errors?.confirm_password?.[0] || "",
       });
-  
-      if (response.status === 200) {
-        console.log('Sign up successful:', response.data);
-        router.push('/home'); // Redirect to home page
-      }
-    } catch (error: any) {
-      if (error.response?.data?.errors) {
-        setErrors({
-          email: error.response.data.errors?.email?.[0] || '',
-          keyWord: error.response.data.errors?.key_word?.[0] || '',
-          password: error.response.data.errors?.password?.[0] || '',
-          confirmPassword: error.response.data.errors?.confirm_password?.[0] || '',
-        });
-      }
-      console.error('Signup failed:', error.response?.data || error);
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+    console.error("Signup failed:", error.response?.data || error);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
-// Sends login request and redirects to users home page
-interface Credentials {
-    email: string;
-    password: string;
-}
-
-export const login = async (credentials: Credentials) => {
-    const response = await api.post('/login/', credentials);
+// Login function
+export const login = async (credentials: { email: string; password: string }, dispatch: AppDispatch) => {
+  try {
+    const response = await api.post("/login/", credentials);
+    if (response.status === 200) {
+      console.log("Login successful:", response.data); // Returns access and refresh tokens
+      dispatch(loginSuccess({
+        id: response.data.user.id,
+        email: response.data.user.email
+      }));
+    }
     return response;
+  } catch (error) {
+    console.error("Login failed:", error);
+    throw error;
+  }
 };
 
-// Sends logout request and redirects to index page
-export const logout = async () => {
-    return api.post('/logout/', {});
+// Logout function
+export const logout = async (dispatch: AppDispatch) => {
+  try {
+    const response = await api.post("/logout/");
+    if (response.status === 200) {
+      console.log("Logout successful:", response.data);
+      dispatch(logoutSuccess()); // Remove user from Redux
+    }
+  } catch (error) {
+    console.error("Logout failed:", error); // First error being thrown
+  }
 };
 
-// Sends a CSRF token request and returns the response
+// Fetch Csrf token
 export const fetchCsrfToken = async () => {
-    try {
-      await api.get('/csrf-token/'); // Call your get_csrf_token endpoint
-      console.log('CSRF token fetched and cookie set.');
-    } catch (err) {
-      console.error('Failed to fetch CSRF token:', err);
-    }
-  };
-
-// Fetches user details from the backend
-export const fetchUserDetails = async () => {
-    try {
-        const response = await api.get('/user-details/');
-        return response.data;
-    } catch (error) {
-        console.error('Error fetching user details:', error);
-        return null;
-    }
+  try {
+    const response = await api.get("/csrf-token/");
+    console.log("CSRF token fetched successfully.");
+    return response;
+  } catch (err) {
+    console.error("CSRF token not available, skipping fetch:", err);
+    return null; // Avoid crashing if CSRF isn't available
+  }
 };

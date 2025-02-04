@@ -1,41 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { fetchCsrfToken,login } from '../utils/auth';
+import { useDispatch } from 'react-redux';
+import { fetchCsrfToken, login } from '../utils/auth';
 
 const Login: React.FC = () => {
   const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+  const dispatch = useDispatch();
 
+  // Fetch CSRF token on page load
   useEffect(() => {
     fetchCsrfToken();
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setCredentials({ ...credentials, [name]: value });
-    setError('');
+    setCredentials({ ...credentials, [e.target.name]: e.target.value });
+    setError(""); // Clear error on input change
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setError('');
+    setError("");
+
+    if (!credentials.email || !credentials.password) {
+      setError("Email and password are required.");
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
-      const response = await login(credentials);
+      const response = await login(credentials, dispatch);
       if (response.status === 200) {
-        console.log('Login successful:', response.data);
-        router.push('/home'); // Redirect to users home page
+        router.push("/home");
       } else {
-        setError(response.data.detail || 'Login failed');
+        throw new Error("Login failed");
       }
-    } catch (err: any) {
-      // Handle network or server errors
-      const errorMessage = err.response?.data?.detail || 'An unexpected error occurred';
-      setError(errorMessage);
-      console.error('Login failed:', err);
+    } catch (err) {
+      console.error("Login failed:", err); // Second error being thrown
+      setError("Failed to authenticate");
     } finally {
       setIsSubmitting(false);
     }

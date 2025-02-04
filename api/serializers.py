@@ -7,7 +7,7 @@ from .models import CustomUser, KeyWords
 class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ['user_id', 'email', 'key_word', 'is_active']
+        fields = ['id', 'email', 'key_word', 'is_active']
 
 class SignUpSerializer(serializers.ModelSerializer):
     key_word = serializers.CharField(required=False, allow_blank=True) # Optional keyword
@@ -22,7 +22,7 @@ class SignUpSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         if CustomUser.objects.filter(email=value).exists():
-            raise serializers.ValidationError("Email already exists.")
+            raise serializers.ValidationError("User with this email already exists.")
         return value
 
     def validate_key_word(self, value):
@@ -67,7 +67,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         # Include user details in the response
         data['user'] = {
-            'id': self.user.user_id,
+            'id': self.user.id,
             'email': self.user.email,
         }
         return data

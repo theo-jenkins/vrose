@@ -1,27 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { fetchUserDetails } from '../utils/auth';
+import React from 'react';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../redux/store';
 
-interface DashboardButtonProps {
-  isAuthenticated: boolean;
-}
+const DashboardButton: React.FC = () => {
+  const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
 
-const DashboardButton: React.FC<DashboardButtonProps> = ({ isAuthenticated }) => {
-  const [user, setUser] = useState<{ email: string } | null>(null);
-
-  useEffect(() => {
-    const getUserDetails = async () => {
-      if (!isAuthenticated) return;
-      try {
-        const userDetails = await fetchUserDetails();
-        setUser(userDetails); // Store user data in state
-      } catch (err) {
-        console.error('Error fetching user details:', err);
-      }
-    };
-    getUserDetails();
-  }, [isAuthenticated]);
-
-  if (!user) return null; // Hide button if no user data
+  if (!isAuthenticated || !user) return null; // Don't render if not authenticated
 
   return (
     <button className="border-2 border-light-button dark:border-dark-button text-light-button dark:text-dark-button font-semibold

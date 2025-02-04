@@ -1,29 +1,24 @@
 import React from 'react';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../redux/store';
 import TopBar from '@/components/TopBar';
 import WelcomeMessage from '@/components/WelcomeMessage';
 import DashboardButton from '@/components/DashboardButton';
-import { GetServerSidePropsContext } from 'next';
-import { parseCookies } from 'nookies'
 
-export const getServerSideProps = async (context: GetServerSidePropsContext) => {
-  const { refresh_token } = parseCookies(context)
-  const isAuthenticated = !!refresh_token
+const HomePage: React.FC = () => {
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
 
-  return { props: { isAuthenticated } }
-};
-
-const HomePage: React.FC<{ isAuthenticated: boolean }> = ({ isAuthenticated }) => {
   return (
     <div className="min-h-screen flex flex-col pt-[5vh]">
       {/* Top Horizontal Bar (NavBar) */}
       <div className="h-[5vh] flex-shrink-0">
-        <TopBar isAuthenticated={isAuthenticated} />
+        <TopBar/>
       </div>
 
       {/* Dashboard button (only for authenticated users) */}
       {isAuthenticated && (
         <div className="flex justify-center items-center p-4">
-          <DashboardButton isAuthenticated={isAuthenticated} />
+          <DashboardButton/>
         </div>
       )}
 

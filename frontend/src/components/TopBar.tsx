@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import ThemeSwitcher from './ThemeSwitcher';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '../../redux/store';
 import { useRouter } from 'next/router';
 import { fetchCsrfToken, logout } from '../utils/auth';
 
-interface TopBarProps {
-    isAuthenticated: boolean;
-}
-
-const TopBar: React.FC<TopBarProps> = ({ isAuthenticated }) => {
+const TopBar: React.FC = () => {
     const router = useRouter();
     const currentPage = router.pathname;
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const dispatch = useDispatch();
+    const { isAuthenticated } = useSelector((state: RootState) => state.auth);
 
-    // Fetch CSRF token on page load
+    // Fetch user details and CSRF token on page load
     useEffect(() => {
         fetchCsrfToken();
       }, []);
@@ -22,7 +22,7 @@ const TopBar: React.FC<TopBarProps> = ({ isAuthenticated }) => {
     const handleLogout = async () => {
         try {
             setIsLoggingOut(true);
-            await logout();
+            await logout(dispatch);
             router.push('/');
         } catch (err) {
             console.error('Logout failed:', err);
@@ -42,7 +42,7 @@ const TopBar: React.FC<TopBarProps> = ({ isAuthenticated }) => {
                 </div>
 
                 {/* Feature Links */}
-                <div className="absolute left-1/2 transform -translate-x-1/2 flex space-x-8 text-light-text dark:text-dark-text">
+                <div className="absolute left-1/2 transform -translate-x-1/2 flex space-x-8 font-serif:Avant-Garde text-light-text dark:text-dark-text">
                     <Link href="/" className="hover:scale-110 transition-all duration:300">Features</Link>
                     <Link href="/" className="hover:scale-110 transition-all duration:300">Pricing</Link>
                     <Link href="/" className="hover:scale-110 transition-all duration:300">Support</Link>

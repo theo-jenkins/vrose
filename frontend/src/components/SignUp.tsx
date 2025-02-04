@@ -1,23 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { fetchCsrfToken, handleSignUp } from '../utils/auth'; // Import fetchCsrfToken and handleSignUp functions
+import { fetchCsrfToken, handleSignUp } from '../utils/auth';
+import { useDispatch } from 'react-redux';
 
 const SignUp: React.FC = () => {
+    const router = useRouter();
+    const dispatch = useDispatch();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
         email: '',
         keyWord: '',
         password: '',
-        confirmPassword: '',
+        confirm_password: '',
     });
     const [errors, setErrors] = useState<Record<string, string>>({
         email: '',
         keyWord: '',
         password: '',
-        confirmPassword: '',
+        confirm_password: '',
     });
-    const router = useRouter();
 
+    // Fetch CSRF token on page load
     useEffect(() => {
         fetchCsrfToken();
     }, []);
@@ -34,14 +37,14 @@ const SignUp: React.FC = () => {
             email: '',
             keyWord: '',
             password: '',
-            confirmPassword: '',
+            confirm_password: '',
         };
 
         if (!formData.email.includes('@')) newErrors.email = 'Please enter a valid email address';
         if (formData.keyWord.includes(' ')) newErrors.keyWord = 'Key word cannot contain spaces';
         if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters long';
-        if (formData.password !== formData.confirmPassword)
-            newErrors.confirmPassword = 'Passwords do not match';
+        if (formData.password !== formData.confirm_password)
+            newErrors.confirm_password = 'Passwords do not match';
 
         setErrors(newErrors);
         return !Object.values(newErrors).some((error) => error !== '');
@@ -50,8 +53,7 @@ const SignUp: React.FC = () => {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!validateForm()) return;
-
-        handleSignUp(formData, setErrors, router, setIsSubmitting);
+        handleSignUp(formData, setErrors, router, setIsSubmitting, dispatch);
     };
 
     return (
@@ -123,10 +125,10 @@ const SignUp: React.FC = () => {
                         <input
                             type="password"
                             id="confirm-password"
-                            name="confirmPassword"
+                            name="confirm_password"
                             className="w-full p-3 rounded-md bg-[#2D282A] text-[#F6D3E4] focus:outline-none focus:ring-2 focus:ring-[#F6D3E4] placeholder-gray-400"
                             placeholder="Confirm your password"
-                            value={formData.confirmPassword}
+                            value={formData.confirm_password}
                             onChange={handleChange}
                         />
                         {errors.confirmPassword && <p className="text-red-500 text-sm">{errors.confirmPassword}</p>}

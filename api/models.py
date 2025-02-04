@@ -26,7 +26,7 @@ class CustomUserManager(BaseUserManager):
     
 # Custom user model including email, password and authenticated keyword
 class CustomUser(AbstractUser):
-    user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
     username = None # Remove username field
 

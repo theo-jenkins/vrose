@@ -5,7 +5,7 @@ import Home from '@/components/Home';
 const HomePage: React.FC = () => {
     return (
         <div>
-            <TopBar isAuthenticated={isAuthenticated} />
+            <TopBar />
             <Home />
         </div>
     );
