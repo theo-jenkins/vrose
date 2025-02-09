@@ -32,13 +32,14 @@ const TopBar: React.FC = () => {
     };
 
     return (
-            <div className="fixed top-0 left-0 w-full h-[10vh] bg-light-background dark:bg-dark-background shadow-md flex items-center">
+            <div className="fixed top-0 left-0 w-full h-[10vh] font-custom bg-light-background dark:bg-dark-background shadow-md flex items-center">
                 {/* Navigation Bar */}
-                <nav className="flex items-center justify-between w-full h-full px-8">
+                <nav className="flex items-center justify-between w-full h-full px-4">
 
                 {/* Logo */}
-                <div className="flex space-x-8 items-center">
-                    <Link href="/" className=" text-light-text dark:text-dark-text">VROSE</Link>
+                <div className="text-light-text dark:text-dark-text flex space-x-4 items-center">
+                    <a href="/"><img src="/static/images/vrose-flower.svg" width={40} height={10} alt="Vrose Logo" /></a>
+                    <Link href="/">VROSE</Link>
                 </div>
 
                 {/* Feature Links */}
@@ -50,6 +51,7 @@ const TopBar: React.FC = () => {
 
                 {/* Right-Side Controls */}
                 <div className="flex items-center space-x-4 ml-auto">
+                    {/* Theme Switcher */}
                     <ThemeSwitcher />
 
                     {/* Authentication Buttons */}

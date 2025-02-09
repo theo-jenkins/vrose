@@ -6,14 +6,14 @@ const WelcomeMessage = () => {
             <div className="w-full max-w-4xl text-light-text dark:text-dark-text rounded-2xl p-8 flex flex-col items-center">
                 {/* Static Image */}
                 <img
-                    src="/static/images/vrose-logo.svg"
+                    src="/static/images/vrose-flower.svg"
                     alt="Vrose Logo"
                     className="w-24 h-24 mb-4"
                 />
 
                 {/* Welcome Text */}
-                <h1 className="text-3xl font-semibold text-center">
-                    Welcome to VROSE
+                <h1 className="text-3xl text-center">
+                    The last fashion buyer you will ever hire.
                 </h1>
             </div>
         </div>

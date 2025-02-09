@@ -9,6 +9,9 @@ export default {
   darkMode: 'class', // Enable class-based dark mode
   theme: {
     extend: {
+      fontFamily: {
+        custom: ['DM-Sans', 'sans-serif'],
+      },
       animation: {
         spinEase: 'spin-ease 0.6s ease-in-out',
       },
