@@ -32,8 +32,8 @@ To do:
 - Add sign in with google to log in page
 - Add a typewriter effect to welcome message
 - Configure dashboard page:
-    1. Flex grid showing 3-4 main features
-    2. Clicking on a feature should redirect to that page
+    1. Flex grid showing 3-4 main features :white_check_mark:
+    2. Clicking on a feature should redirect to that page :construction:
 - Fix logout redirecting to sign in page and not deleting auth state :white_check_mark:
 
 Design Choices:
