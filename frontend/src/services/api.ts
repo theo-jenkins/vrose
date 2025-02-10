@@ -1,44 +1,58 @@
+// api.ts
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import Cookies from 'js-cookie';
+// Import your Redux store and logout action
+import store from '../../redux/store';
+import { logoutSuccess } from '../../redux/slices/authSlice';
+
+// Extend AxiosRequestConfig to include our custom _retry flag.
+interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+}
 
 const api: AxiosInstance = axios.create({
-    baseURL: 'http://localhost:8000/api',
-    withCredentials: true, // Important for sending/receiving cookies
-    xsrfCookieName: 'csrftoken',     // Cookie name Django sets
-    xsrfHeaderName: 'X-CSRFToken',   // Header name Django expects
+  baseURL: 'http://localhost:8000/api',
+  withCredentials: true, // Important for sending/receiving cookies
+  xsrfCookieName: 'csrftoken', // Django’s CSRF cookie name
+  xsrfHeaderName: 'X-CSRFToken', // Django expects this header
 });
 
-// Request interceptor
-api.interceptors.request.use((config) => {
-    // Retrieve the CSRF token from the `csrftoken` cookie
-    const csrfToken = Cookies.get('csrftoken');
-    if (csrfToken) {
-      config.headers['X-CSRFToken'] = csrfToken;
-    }
-    return config;
-  });
+// Request interceptor: Attach CSRF token from cookies.
+api.interceptors.request.use((config: CustomAxiosRequestConfig) => {
+  const csrfToken = Cookies.get('csrftoken');
+  if (csrfToken) {
+    config.headers['X-CSRFToken'] = csrfToken;
+  }
+  return config;
+});
 
-// Response interceptor
+// Response interceptor: Handle 401 errors by attempting a token refresh.
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest: CustomAxiosRequestConfig = error.config;
 
-    if (error?.response?.status === 401 && !originalRequest._retry) {
+    // Check if error is 401, hasn't been retried, and is not a refresh request itself.
+    if (
+      error?.response?.status === 401 &&
+      !originalRequest._retry &&
+      originalRequest.url !== '/token/refresh/'
+    ) {
       originalRequest._retry = true;
       try {
         // Attempt to refresh the token
-        await api.post('/token/refresh/', {}, {
-          withCredentials: true
-        });
-        
-        // Retry the original request
+        await api.post('/token/refresh/', {}, { withCredentials: true });
+        // Retry the original request after a successful refresh
         return api(originalRequest);
       } catch (refreshError) {
+        // Dispatch logout action to clear Redux auth state.
+        store.dispatch(logoutSuccess());
+        // Redirect the user to the login page.
         window.location.href = '/auth/login';
         return Promise.reject(refreshError);
       }
     }
+
     return Promise.reject(error);
   }
 );

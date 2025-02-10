@@ -19,13 +19,13 @@ To do:
 - Add redux state manager to save user auth and preferences :white_check_mark:
 - Change imports to relative imports
 - Fix tree hydration error :white_check_mark:
-- Add CSRF token to redux store
+- Add check for CSRF token before fetching it :white_check_mark:
 - Add custom font support (DN-Sans) :white_check_mark:
 - Adjust the sign up flow:
-    1. User selects sign up
-    2. User enters email
-    3. Page shows 'continue' or 'sign up with google' button
-    4. Continue button should render a form with email, password, confirm password, and sign up button
+    1. User selects sign up :white_check_mark:
+    2. User enters email :white_check_mark:
+    3. Page shows 'continue' or 'sign up with google' button :construction:
+    4. Continue button should render a form with email, password, confirm password, and sign up button :white_check_mark:
     5. Sign up button should be disabled until all fields are filled
     6. Implement google sign up
 - Remove keyword from sign up and models
@@ -34,6 +34,7 @@ To do:
 - Configure dashboard page:
     1. Flex grid showing 3-4 main features
     2. Clicking on a feature should redirect to that page
+- Fix logout redirecting to sign in page and not deleting auth state :white_check_mark:
 
 Design Choices:
 - Buttons should be outlined and rounded by default

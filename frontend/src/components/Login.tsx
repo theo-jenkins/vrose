@@ -10,7 +10,7 @@ const Login: React.FC = () => {
   const router = useRouter();
   const dispatch = useDispatch();
 
-  // Fetch CSRF token on page load
+  // Check for CSRF token
   useEffect(() => {
     fetchCsrfToken();
   }, []);
@@ -34,7 +34,7 @@ const Login: React.FC = () => {
     try {
       const response = await login(credentials, dispatch);
       if (response.status === 200) {
-        router.push("/home");
+        router.push("/");
       } else {
         throw new Error("Login failed");
       }

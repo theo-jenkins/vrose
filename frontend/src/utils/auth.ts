@@ -1,11 +1,13 @@
 import api from "../services/api";
+import Cookies from 'js-cookie';
 import { AppDispatch } from "../../redux/store";
 import { loginSuccess, logoutSuccess } from "../../redux/slices/authSlice";
+import { SignUpErrors } from "../components/SignUp";
 
 // Sign up function
 export const handleSignUp = async (
-  formData: { email: string; keyWord: string; password: string; confirm_password: string },
-  setErrors: (errors: Record<string, string>) => void,
+  formData: { email: string; confirm_email: string; password: string; confirm_password: string },
+  setErrors: React.Dispatch<React.SetStateAction<SignUpErrors>>,
   router: any,
   setIsSubmitting: (isSubmitting: boolean) => void,
   dispatch: AppDispatch // Redux dispatch
@@ -21,13 +23,13 @@ export const handleSignUp = async (
         id: response.data.user.id,
         email: response.data.user.email
       }));
-      router.push("/home"); // Redirect to home
+      router.push("/"); // Redirect to home
     }
   } catch (error: any) {
     if (error.response?.data?.errors) {
       setErrors({
         email: error.response.data.errors?.email?.[0] || "",
-        keyWord: error.response.data.errors?.key_word?.[0] || "",
+        confirm_email: error.response.data.errors?.confirm_email?.[0] || "",
         password: error.response.data.errors?.password?.[0] || "",
         confirm_password: error.response.data.errors?.confirm_password?.[0] || "",
       });
@@ -64,6 +66,7 @@ export const logout = async (dispatch: AppDispatch) => {
       console.log("Logout successful:", response.data);
       dispatch(logoutSuccess()); // Remove user from Redux
     }
+    return response;
   } catch (error) {
     console.error("Logout failed:", error); // First error being thrown
   }
@@ -71,12 +74,20 @@ export const logout = async (dispatch: AppDispatch) => {
 
 // Fetch Csrf token
 export const fetchCsrfToken = async () => {
+  // Check if the CSRF token already exists in the cookies
+  const existingToken = Cookies.get('csrftoken');
+  if (existingToken) {
+    console.log('CSRF token already exists:', existingToken);
+    return Promise.resolve(existingToken);
+  }
+
   try {
-    const response = await api.get("/csrf-token/");
-    console.log("CSRF token fetched successfully.");
-    return response;
-  } catch (err) {
-    console.error("CSRF token not available, skipping fetch:", err);
-    return null; // Avoid crashing if CSRF isn't available
+    const response = await api.post("/csrf-token/");
+    const data = await response.data;
+    console.log('CSRF token fetched:', data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching CSRF token:', error);
+    throw error;
   }
 };

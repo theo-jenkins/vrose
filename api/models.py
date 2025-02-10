@@ -24,7 +24,7 @@ class CustomUserManager(BaseUserManager):
             raise ValueError('Superuser must have is_superuser=True.')
         return self.create_user(email, password, **extra_fields)
     
-# Custom user model including email, password and authenticated keyword
+# Custom user model including email and password
 class CustomUser(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
@@ -53,18 +53,3 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.email
-
-# Key word model to track used key words
-class KeyWords(models.Model):
-    key_word = models.CharField(max_length=100, unique=True)
-    used = models.BooleanField(default=False)  # Tracks if the keyword has been used
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='key_word'
-    )
-
-    def __str__(self):
-        return self.key_word

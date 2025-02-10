@@ -93,23 +93,25 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 # Log out endpoint
 @method_decorator(csrf_protect, name='dispatch')
 class LogoutView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         try:
             # Extract the refresh token from the cookies
             refresh_token = request.COOKIES.get('refresh_token')
-            if not refresh_token:
-                return Response({"success": False, "message": "Refresh token is required"}, status=400)
-
-            # Invalidate the refresh token
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-
+            
             # Clear the cookies on the client side
             response = Response({"success": True, "message": "User logged out successfully"}, status=200)
             response.delete_cookie('access_token')
             response.delete_cookie('refresh_token')
+
+            # Invalidate the refresh token
+            if refresh_token:
+                try:
+                    token = RefreshToken(refresh_token)
+                    token.blacklist()
+                except Exception as e:
+                    pass
 
             return response
         except Exception as e:
