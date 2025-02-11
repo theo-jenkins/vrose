@@ -54,27 +54,27 @@ const TopBar: React.FC = () => {
                         <button
                             onClick={handleLogout}
                             disabled={isLoggingOut}
-                            className="border-2 border-light-button dark:border-dark-button text-light-button dark:text-dark-button font-semibold
-                                                    px-2 py-1 rounded-md transition-all duration-300
-                                                    hover:scale-110 hover:border-light-button dark:hover:border-dark-button-hover">
+                            className="font-semibold shadow-custom-light dark:shadow-custom-dark
+                                        text-light-text dark:text-dark-text px-2 py-1 rounded-md 
+                                        hover:scale-110 transition-all duration-300">
                             {isLoggingOut ? 'Signing Out...' : 'Sign Out'}
                         </button>
                     ) : (
                         <>
                             {currentPage !== '/auth/login' && (
                                 <Link href="/auth/login">
-                                    <button className="border-2 border-light-button dark:border-dark-button text-light-button dark:text-dark-button font-semibold
-                                                    px-2 py-1 rounded-md transition-all duration-300
-                                                    hover:scale-110 hover:border-light-button dark:hover:border-dark-button-hover">
+                                    <button className="font-semibold shadow-custom-light dark:shadow-custom-dark
+                                                    text-light-text dark:text-dark-text px-2 py-1 rounded-md 
+                                                    hover:scale-110 transition-all duration-300">
                                         Login
                                     </button>
                                 </Link>
                             )}
                             {currentPage !== '/auth/signup' && (
                                 <Link href="/auth/signup">
-                                    <button className="border-2 border-light-button dark:border-dark-button text-light-button dark:text-dark-button font-semibold
-                                                    px-2 py-1 rounded-md transition-all duration-300
-                                                    hover:scale-110 hover:border-light-button dark:hover:border-dark-button-hover">
+                                    <button className="bg-light-primary-button dark:bg-dark-primary-button
+                                                    text-light-button-text dark:text-dark-button-text font-semibold px-2 py-1 rounded-md
+                                                    hover:scale-110 transition-all duration-300">
                                         Sign Up
                                     </button>
                                 </Link>

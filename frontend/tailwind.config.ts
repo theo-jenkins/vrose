@@ -22,12 +22,17 @@ export default {
           '100%': { transform: 'rotate(360deg)' },
         }
       },
+      boxShadow: {
+        'custom-light': '0 0 2px #191516',
+        'custom-dark': '0 0 2px #FCEEF5',
+      },
       colors: {
         light: {
-          background: '#fbeff2',
+          background: '#FCEEF5',
           text: '#191516',
-          button: '#191516',
-          'button-text': '#8a0b6f',
+          'primary-button': '#F2BBD5',
+          'secondary-button': '#191516',
+          'button-text': '#191516',
           'button-hover': '#f3c8da',
           'button-text-hover': '#6d085a',
           'form-field': '#ffffff',
@@ -36,12 +41,13 @@ export default {
         },
         dark: {
           background: '#191516',
-          text: '#f5dbe8',
-          button: '#f5dbe8',
+          text: '#FCEEF5',
+          'primary-button': '#F2BBD5',
+          'secondary-button': '#FCEEF5',
           'button-text': '#191516',
           'button-hover': '#e3c3d4',
           'button-text-hover': '#d3b4c2',
-          'form-field': '#f5dbe8',
+          'form-field': '#2D282A',
           accent: '#8a0b6f',
           error: '#d9233f',
         },

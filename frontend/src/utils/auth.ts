@@ -42,6 +42,9 @@ export const handleSignUp = async (
 
 // Login function
 export const login = async (credentials: { email: string; password: string }, dispatch: AppDispatch) => {
+  // Clears cookies to not interfere with new login
+  Cookies.remove('access_token');
+  Cookies.remove('refresh_token');
   try {
     const response = await api.post("/login/", credentials);
     if (response.status === 200) {
@@ -53,7 +56,7 @@ export const login = async (credentials: { email: string; password: string }, di
     }
     return response;
   } catch (error) {
-    console.error("Login failed:", error);
+    console.error("Login failed (1):", error);
     throw error;
   }
 };
@@ -77,12 +80,11 @@ export const fetchCsrfToken = async () => {
   // Check if the CSRF token already exists in the cookies
   const existingToken = Cookies.get('csrftoken');
   if (existingToken) {
-    console.log('CSRF token already exists:', existingToken);
+    console.log('CSRF token already exists.');
     return Promise.resolve(existingToken);
   }
-
   try {
-    const response = await api.post("/csrf-token/");
+    const response = await api.get("/csrf-token/");
     const data = await response.data;
     console.log('CSRF token fetched:', data);
     return data;
@@ -91,3 +93,4 @@ export const fetchCsrfToken = async () => {
     throw error;
   }
 };
+

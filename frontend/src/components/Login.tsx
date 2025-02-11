@@ -35,11 +35,9 @@ const Login: React.FC = () => {
       const response = await login(credentials, dispatch);
       if (response.status === 200) {
         router.push("/");
-      } else {
-        throw new Error("Login failed");
       }
     } catch (err) {
-      console.error("Login failed:", err); // Second error being thrown
+      console.error("Login failed (2):", err);
       setError("Failed to authenticate");
     } finally {
       setIsSubmitting(false);
@@ -47,10 +45,13 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#191516]">
-      <div className="w-full max-w-md bg-[#191516] text-[#F6D3E4] rounded-lg p-8 hover:shadow-[0_0_10px_#F6D3E4] transition-shadow duration-300">
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#161313]">
+      <div className="w-full max-w-md bg-light-background dark:bg-dark-background text-light-text dark:text-dark-text shadow-custom-light dark:shadow-custom-dark rounded-lg p-8">
         <h2 className="text-3xl font-semibold text-center mb-6">Sign In</h2>
-        
+
+        {/* Divider */}
+        <hr className="my-6 h-px border-0 bg-gradient-to-r from-transparent via-[#191516] dark:via-[#FCEEF5] to-transparent opacity-100" />
+
         <form className="space-y-6" onSubmit={handleSubmit}>
           {/* Email */}
           <div>
@@ -63,7 +64,7 @@ const Login: React.FC = () => {
               name="email"
               value={credentials.email}
               onChange={handleChange}
-              className="w-full p-3 rounded-md bg-[#2D282A] text-[#F6D3E4] focus:outline-none focus:ring-2 focus:ring-[#F6D3E4]"
+              className="w-full p-3 rounded-md bg-light-form-field dark:bg-dark-form-field shadow-custom-light"
               placeholder="Enter your email"
             />
           </div>
@@ -79,7 +80,7 @@ const Login: React.FC = () => {
               name="password"
               value={credentials.password}
               onChange={handleChange}
-              className="w-full p-3 rounded-md bg-[#2D282A] text-[#F6D3E4] focus:outline-none focus:ring-2 focus:ring-[#F6D3E4]"
+              className="w-full p-3 rounded-md bg-light-form-field dark:bg-dark-form-field shadow-custom-light"
               placeholder="Enter your password"
             />
           </div>
@@ -90,7 +91,7 @@ const Login: React.FC = () => {
           {/* Submit Button */}
           <button
             type="submit"
-            className="w-full py-3 bg-[#F6D3E4] text-[#191516] font-semibold rounded-md hover:bg-[#e9c0d4] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F6D3E4]"
+            className="w-full py-3 bg-light-primary-button dark:bg-dark-primary-button text-light-text dark:text-dark-text font-semibold rounded-md hover:scale-105 transition-transform duration-300"
             disabled={isSubmitting}
           >
             {isSubmitting ? 'Signing In...' : 'Sign In'}

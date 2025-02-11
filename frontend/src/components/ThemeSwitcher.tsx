@@ -32,13 +32,13 @@ const ThemeSwitcher = () => {
     <button
       onClick={toggleTheme}
       className={`flex items-center justify-center w-10 h-10 rounded-full shadow-md hover:scale-110 transition-transform duration-300
-      ${theme === "light" ? "bg-light-button text-light-button-text" : "bg-dark-button text-dark-button-text"}`}
+      ${theme === "light" ? "bg-dark-background text-dark-button-text" : "bg-light-background text-light-button-text"}`}
       aria-label="Toggle Theme"
     >
       {theme === "light" ? (
-        <MoonIcon className={`w-6 h-6 text-dark-button ${clicked ? "animate-spinEase" : ""}`} />
+        <MoonIcon className={`w-6 h-6 text-dark-primary-button ${clicked ? "animate-spinEase" : ""}`} />
       ) : (
-        <SunIcon className={`w-6 h-6 text-light-button ${clicked ? "animate-spinEase" : ""}`} />
+        <SunIcon className={`w-6 h-6 text-light-secondary-button ${clicked ? "animate-spinEase" : ""}`} />
       )}
     </button>
   );

@@ -10,9 +10,9 @@ const DashboardButton: React.FC = () => {
 
   return (
     <Link href="/dashboard">
-      <button className="border-2 border-light-button text-light-button font-custom
-                          px-2 py-1 rounded-md transition-all duration-300
-                          hover:scale-105 hover:border-light-button dark:hover:border-dark-button-hover">
+      <button className=" border-dark-background dark:border-dark-primary-button text-light-button-text dark:text-dark-text font-custom
+                          px-2 py-1 rounded-md border-2
+                          hover:scale-105 transition-all duration-300">
         Welcome back, {user.email}! Go to dashboard
       </button>
     </Link>

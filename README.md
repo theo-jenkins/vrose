@@ -28,13 +28,22 @@ To do:
     4. Continue button should render a form with email, password, confirm password, and sign up button :white_check_mark:
     5. Sign up button should be disabled until all fields are filled
     6. Implement google sign up
-- Remove keyword from sign up and models
+- Remove keyword from sign up and models :white_check_mark:
 - Add sign in with google to log in page
 - Add a typewriter effect to welcome message
 - Configure dashboard page:
     1. Flex grid showing 3-4 main features :white_check_mark:
     2. Clicking on a feature should redirect to that page :construction:
 - Fix logout redirecting to sign in page and not deleting auth state :white_check_mark:
+- Adjust sizing for mobile
+- Set permissions for dashboard features :white_check_mark:
+- Add dashboard features table :white_check_mark:
+- Add dashboard features to admin panel :white_check_mark:
+- Set permissions based on user roles
+- Fix login for different users when tokens are expired.
+- Set .svg files to be colored based on system theme
+- Fix form 2 in signup being restricted width ways
+- Improve 'go to dashboard' button aesthetics
 
 Design Choices:
 - Buttons should be outlined and rounded by default

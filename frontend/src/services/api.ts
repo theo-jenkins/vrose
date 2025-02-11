@@ -3,7 +3,7 @@ import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 
 import Cookies from 'js-cookie';
 // Import your Redux store and logout action
 import store from '../../redux/store';
-import { logoutSuccess } from '../../redux/slices/authSlice';
+import { logoutSuccess, fetchUserDetails } from '../../redux/slices/authSlice';
 
 // Extend AxiosRequestConfig to include our custom _retry flag.
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
@@ -42,11 +42,24 @@ api.interceptors.response.use(
       try {
         // Attempt to refresh the token
         await api.post('/token/refresh/', {}, { withCredentials: true });
+        console.log('Token refreshed successfully.');
+
+        // Sets redux auth state
+        store.dispatch(fetchUserDetails());
+
         // Retry the original request after a successful refresh
         return api(originalRequest);
+
       } catch (refreshError) {
+        console.log('Refresh token failed:', refreshError);
+
+        // Clear the cookies
+        Cookies.remove('access_token');
+        Cookies.remove('refresh_token');
+
         // Dispatch logout action to clear Redux auth state.
         store.dispatch(logoutSuccess());
+        
         // Redirect the user to the login page.
         window.location.href = '/auth/login';
         return Promise.reject(refreshError);

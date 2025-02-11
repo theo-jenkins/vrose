@@ -35,7 +35,8 @@ class CustomUser(AbstractUser):
 
     class Meta:
         permissions = (
-            ("access_special_features", "Can access special features"),
+            ("access_none", "Can access none"),
+            ("access_all", "Can access all"),
         )
 
     groups = models.ManyToManyField(
@@ -53,3 +54,15 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.email
+    
+# Dashboard feature model
+class DashboardFeature(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    key = models.CharField(max_length=100, unique=True)
+    title = models.CharField(max_length=100)
+    route = models.CharField(max_length=100)
+    icon = models.CharField(max_length=100, blank=True, null=True)
+    permission_code = models.CharField(max_length=100, blank=True, null=True)
+
+    def __str__(self):
+        return self.title

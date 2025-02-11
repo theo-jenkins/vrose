@@ -2,7 +2,6 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.http import JsonResponse
@@ -10,6 +9,7 @@ from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from .serializers import SignUpSerializer, CustomTokenObtainPairSerializer
+from .models import DashboardFeature
 
 
 # API endpoint for fetching CSRF token
@@ -64,6 +64,7 @@ class SignUpView(APIView):
 # API endpoint for user login (token issuance)
 @method_decorator(csrf_protect, name='dispatch')
 class CustomTokenObtainPairView(TokenObtainPairView):
+    permission_classes = [AllowAny]
     serializer_class = CustomTokenObtainPairSerializer
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
@@ -143,3 +144,28 @@ class UserDetailsView(APIView):
             "permissions": list(permissions)
         }
         return Response(response)
+    
+# API endpoint for fetching dashboard features
+class DashboardFeaturesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        features_qs = DashboardFeature.objects.all()
+        features_list = []
+        
+        for feature in features_qs:
+            if not feature.permission_code: # If no permission code is set, assume user has access
+                enabled = True
+            else:
+                enabled = user.has_perm(f'{feature._meta.app_label}.{feature.permission_code}')
+            
+            features_list.append({
+                'key': feature.key,
+                'title': feature.title,
+                'route': feature.route,
+                'icon': feature.icon,
+                'enabled': enabled,
+            })
+
+        return Response({"features": features_list}, status=200)

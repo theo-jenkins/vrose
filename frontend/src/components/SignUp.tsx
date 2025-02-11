@@ -104,10 +104,10 @@ const SignUp: React.FC = () => {
   
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="w-full max-w-md bg-light-background dark:bg-dark-background text-light-text dark:text-dark-text rounded-lg p-8">
+      <div className="w-full max-w-md bg-light-background dark:bg-dark-background text-light-text dark:text-dark-text shadow-custom-light dark:shadow-custom-dark rounded-lg p-8">
         <h2 className="text-3xl font-semibold text-center mb-2">Sign Up</h2>
         {/* Divider */}
-        <hr className="my-6 h-px border-0 bg-gradient-to-r from-transparent via-[#F6D3E4] to-transparent opacity-100" />
+        <hr className="my-6 h-px border-0 bg-gradient-to-r from-transparent via-[#191516] dark:via-[#FCEEF5] to-transparent opacity-100" />
         
         <form className="space-y-3"onSubmit={formStep === 1 ? handleContinue : handleSubmit}>
           {/* Always render the email field */}
@@ -119,7 +119,7 @@ const SignUp: React.FC = () => {
               type="email"
               name="email"
               id="email"
-              className="w-full p-3 mb-2 rounded-md bg-[#2D282A] text-[#F6D3E4] focus:outline-none focus:ring-2 focus:ring-[#F6D3E4] placeholder-gray-400"
+              className="w-full p-3 mb-2 rounded-md bg-light-form-field dark:bg-dark-form-field placeholder-gray-400"
               placeholder="Enter your email"
               value={formData.email}
               onChange={handleChange}
@@ -131,7 +131,7 @@ const SignUp: React.FC = () => {
           {formStep === 1 && (
             <button
               type="submit"
-              className="w-full py-3 bg-[#F6D3E4] text-[#191516] font-semibold rounded-md hover:bg-[#e9c0d4] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F6D3E4]"
+              className="w-full py-3 bg-light-primary-button dark:bg-dark-primary-button text-[#191516] font-semibold rounded-md hover:scale-105 transition-all duration:300 focus:outline-none"
             >
               Continue
             </button>
@@ -139,7 +139,7 @@ const SignUp: React.FC = () => {
           
           {/* Animate the additional fields container */}
           <div
-            className={`overflow-hidden py-2 transition-all duration-300 ${
+            className={`overflow-hidden py-2 px-2 transition-all duration-300 ${
               formStep === 2 ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
             }`}
           >
@@ -154,7 +154,7 @@ const SignUp: React.FC = () => {
                     type="email"
                     name="confirm_email"
                     id="confirm_email"
-                    className="w-full p-3 mb-2 rounded-md bg-[#2D282A] text-[#F6D3E4] focus:outline-none focus:ring-2 focus:ring-[#F6D3E4] placeholder-gray-400"
+                    className="w-full p-3 mb-2 rounded-md bg-light-form-field dark:bg-dark-form-field placeholder-gray-400"
                     placeholder="Confirm your email"
                     value={formData.confirm_email}
                     onChange={handleChange}
@@ -163,7 +163,7 @@ const SignUp: React.FC = () => {
                 </div>
 
                 {/* Divider */}
-                <hr className="my-4 h-px border-0 bg-gradient-to-r from-transparent via-[#F6D3E4] to-transparent opacity-100" />
+                <hr className="my-4 h-px border-0 bg-gradient-to-r from-transparent via-[#191516] dark:via-[#FCEEF5] to-transparent opacity-100" />
                 
                 {/* Password Field */}
                 <div>
@@ -174,7 +174,7 @@ const SignUp: React.FC = () => {
                     type="password"
                     id="password"
                     name="password"
-                    className="w-full p-3 mb-2 rounded-md bg-[#2D282A] text-[#F6D3E4] focus:outline-none focus:ring-2 focus:ring-[#F6D3E4] placeholder-gray-400"
+                    className="w-full p-3 mb-2 rounded-md bg-light-form-field dark:bg-dark-form-field placeholder-gray-400"
                     placeholder="Enter your password"
                     value={formData.password}
                     onChange={handleChange}
@@ -191,7 +191,7 @@ const SignUp: React.FC = () => {
                     type="password"
                     id="confirm_password"
                     name="confirm_password"
-                    className="w-full p-3 mb-2 rounded-md bg-[#2D282A] text-[#F6D3E4] focus:outline-none focus:ring-2 focus:ring-[#F6D3E4] placeholder-gray-400"
+                    className="w-full p-3 mb-2 rounded-md bg-light-form-field dark:bg-dark-form-field placeholder-gray-400"
                     placeholder="Confirm your password"
                     value={formData.confirm_password}
                     onChange={handleChange}
@@ -203,8 +203,8 @@ const SignUp: React.FC = () => {
                   type="submit"
                   disabled={isSubmitting}
                   className={`w-full py-3 mt-3 ${
-                    isSubmitting ? 'bg-gray-400' : 'bg-[#F6D3E4]'
-                  } text-[#191516] font-semibold rounded-md hover:bg-[#e9c0d4] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F6D3E4]`}
+                    isSubmitting ? 'bg-gray-400' : 'bg-light-primary-button dark:bg-dark-primary-button'
+                  } text-[#191516] font-semibold rounded-md hover:scale-105 transition-all duration:300 focus:outline-none`}
                 >
                   {isSubmitting ? 'Signing Up...' : 'Sign Up'}
                 </button>

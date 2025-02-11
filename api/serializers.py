@@ -41,7 +41,7 @@ class SignUpSerializer(serializers.ModelSerializer):
         user = CustomUser.objects.create_user(email=email, password=password)
 
         # Grant special permissions (temporary for keyword replacement)
-        special_permissions = Permission.objects.get(codename='access_special_features')
+        special_permissions = Permission.objects.get(codename='access_all')
         user.user_permissions.add(special_permissions)
 
         return user

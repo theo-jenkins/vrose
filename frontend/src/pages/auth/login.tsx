@@ -4,7 +4,7 @@ import Login from '@/components/Login';
 
 const LoginPage: React.FC = () => {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#191516]">
+        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#161313]">
             <TopBar />
             <Login />
         </div>

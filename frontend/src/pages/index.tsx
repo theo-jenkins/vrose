@@ -9,7 +9,7 @@ const HomePage: React.FC = () => {
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
 
   return (
-    <div className="min-h-screen flex flex-col pt-[5vh]">
+    <div className="min-h-screen flex flex-col pt-[5vh] bg-white dark:bg-[#161313]">
       {/* Top Horizontal Bar (NavBar) */}
       <div className="h-[5vh] flex-shrink-0">
         <TopBar/>
