@@ -8,6 +8,8 @@ from django.http import JsonResponse
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
+from google.oauth2 import id_token
+from google.auth.transport import requests
 from .serializers import SignUpSerializer, CustomTokenObtainPairSerializer
 from .models import DashboardFeature
 
@@ -169,3 +171,87 @@ class DashboardFeaturesView(APIView):
             })
 
         return Response({"features": features_list}, status=200)
+
+User = get_user_model()
+
+class GoogleAuthView(APIView):
+    def post(self, request):
+        # Handle JSON data (modern approach) instead of form-data
+        try:
+            data = json.loads(request.body)
+            token = data.get('token')
+        except json.JSONDecodeError:
+            return Response(
+                {"success": False, "error": "Invalid JSON data"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not token:
+            return Response(
+                {"success": False, "error": "Token is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Validate the Google ID token
+            id_info = id_token.verify_oauth2_token(
+                token,
+                requests.Request(),
+                '735267755465-memcani6u0bs11s1c5uq4hlefvc3fopf.apps.googleusercontent.com'  # Replace with env var
+            )
+
+            # Extract user data
+            email = id_info['email']
+            name = id_info.get('name', 'No Name')
+
+            # Create or get user (use email as username if missing)
+            user, created = User.objects.get_or_create(
+                email=email,
+                defaults={'username': email.split('@')[0], 'first_name': name}  # Better username handling
+            )
+
+            # Generate JWT tokens
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+
+            # Response data
+            response_data = {
+                "success": True,
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "name": name,
+                },
+                "access": access_token,
+                "refresh": str(refresh),
+            }
+
+            # Set HTTP-only cookies (secure in production)
+            response = Response(
+                response_data,
+                status=status.HTTP_200_OK  # 200 is more appropriate for auth
+            )
+            response.set_cookie(
+                key='access_token',
+                value=access_token,
+                httponly=True,
+                secure=True,  # True in production (requires HTTPS)
+                samesite='Lax',
+                max_age=3600 * 24,  # 1 day expiry
+            )
+            response.set_cookie(
+                key='refresh_token',
+                value=str(refresh),
+                httponly=True,
+                secure=True,  # True in production
+                samesite='Lax',
+                max_age=3600 * 24 * 7,  # 7 days expiry
+            )
+
+            return response
+
+        except ValueError as e:
+            return Response(
+                {"success": False, "error": "Invalid Google token"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )

@@ -1,3 +1,79 @@
+# Completion Roadmap
+
+---
+
+### Stage Zero: Project Setup ![██████████] 100%
+- Define the project scope and goals clearly
+- Download and install all project dependencies
+- Configure environment variables for dev and prod
+
+---
+
+### Stage One: User Authentication ![█████████-] 90%
+- Configure signup, login, password reset flows
+- Establish user roles and privileges (e.g., shop owner, admin)
+- Configure Django admin portal for user management
+- Enable Google Sign in flow.
+
+---
+
+### Stage Two: User Experience ![██████████] 100%
+- Choose and implement design style / UI framework
+- Add theme switcher with light/dark mode support
+
+---
+
+### Stage Three: Data Upload & Parsing ![----------] 0%
+- Securely handle file uploads (CSV, Excel, PDF)
+- Extract tabular data from uploaded files
+- Auto-map data fields to your structured DB schema
+- Identify missing or ambiguous data and prompt user for clarification
+
+---
+
+### Stage Four: Data Visualization ![----------] 0%
+- Design and implement interactive charts/tables to display uploaded data
+- Include filters, sorting, and summary statistics for user insight
+- Ensure responsiveness and theme compatibility
+
+---
+
+### Stage Five: AI Agent Implementation ![----------] 0%
+- Integrate OpenAI GPT (or other AI) for order recommendation generation
+- Develop chatbot interface for user interaction and querying AI insights
+- Implement ML logic for personalized order adjustments based on user data
+
+---
+
+### Stage Six: User Interface Refinement ![----------] 0%
+- Streamline user flow from login to data upload and AI recommendation viewing
+- Ensure consistent UI design aligned with theme switcher and branding
+- Add error handling, loading states, and user feedback components
+
+---
+
+### Stage Seven: Landing Pages ![----------] 0%
+- Build public-facing landing pages (About, Pricing, Support, Contact)
+- Optimize for SEO and responsiveness
+- Add analytics tracking if needed
+
+---
+
+### Stage Eight (Optional): Payment Integration ![----------] 0%
+- Integrate Stripe or alternative payment gateway for subscription/payments
+- Implement billing management and secure payment flows
+
+---
+
+### Stage Nine: Deployment ![----------] 0%
+- Finalize Docker containers for backend, frontend, and database
+- Set up VPS environment with Docker and reverse proxy (Nginx)
+- Deploy containers, configure SSL, domain, and monitoring
+
+---
+
+
+
 To do:
 - Add a key word admin portal :white_check_mark:
 - Add form validation with CSRF protection :white_check_mark:
@@ -53,3 +129,8 @@ Design Choices:
 - Links should highlight on hover
 - Links should bolded on hover?
 - Dashboard link should have chevron
+
+Possible UI style (6th May 2025):
+- Buttons are floaties on a pool of water
+- Taping a button should make a ripple effect
+- Simulate colliding buttons from the ripple effect
