@@ -11,7 +11,7 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
 }
 
 const api: AxiosInstance = axios.create({
-  baseURL: 'http://localhost:8000/api',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api',
   withCredentials: true, // Important for sending/receiving cookies
   xsrfCookieName: 'csrftoken', // Django’s CSRF cookie name
   xsrfHeaderName: 'X-CSRFToken', // Django expects this header

@@ -19,6 +19,7 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
 # Copy the backend directory
 COPY backend/ /app/backend/
+COPY api/ /app/api/
 
 # Copy manage.py to the container
 COPY manage.py /app/

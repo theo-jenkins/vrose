@@ -6,7 +6,7 @@ import { SignUpErrors } from "../components/SignUp";
 
 // Sign up function
 export const handleSignUp = async (
-  formData: { email: string; confirm_email: string; password: string; confirm_password: string },
+  formData: { first_name: string; last_name: string; email: string; confirm_email: string; password: string; confirm_password: string },
   setErrors: React.Dispatch<React.SetStateAction<SignUpErrors>>,
   router: any,
   setIsSubmitting: (isSubmitting: boolean) => void,
@@ -20,14 +20,18 @@ export const handleSignUp = async (
     if (response.status === 201) {
       console.log("Sign up successful:", response.data);
       dispatch(loginSuccess({
-        id: response.data.user.id,
-        email: response.data.user.email
+        user: response.data.user,
+        accessToken: response.data.access,
+        refreshToken: response.data.refresh,
+        isGoogleAuth: false
       }));
       router.push("/"); // Redirect to home
     }
   } catch (error: any) {
     if (error.response?.data?.errors) {
       setErrors({
+        first_name: error.response.data.errors?.first_name?.[0] || "",
+        last_name: error.response.data.errors?.last_name?.[0] || "",
         email: error.response.data.errors?.email?.[0] || "",
         confirm_email: error.response.data.errors?.confirm_email?.[0] || "",
         password: error.response.data.errors?.password?.[0] || "",
@@ -50,8 +54,10 @@ export const login = async (credentials: { email: string; password: string }, di
     if (response.status === 200) {
       console.log("Login successful:", response.data); // Returns access and refresh tokens
       dispatch(loginSuccess({
-        id: response.data.user.id,
-        email: response.data.user.email
+        user: response.data.user,
+        accessToken: response.data.access,
+        refreshToken: response.data.refresh,
+        isGoogleAuth: false
       }));
     }
     return response;
@@ -72,6 +78,60 @@ export const logout = async (dispatch: AppDispatch) => {
     return response;
   } catch (error) {
     console.error("Logout failed:", error); // First error being thrown
+  }
+};
+
+// Google authentication function
+export const handleGoogleSuccess = async (
+  credentialResponse: any,
+  dispatch: AppDispatch,
+  router: any,
+  onSuccess?: () => void,
+  onError?: (error: string) => void
+) => {
+  // Clears cookies to not interfere with new login
+  Cookies.remove('access_token');
+  Cookies.remove('refresh_token');
+  
+  try {
+    // Ensure CSRF token is available before making the request
+    await fetchCsrfToken();
+    
+    console.log('Making Google auth request with credential:', credentialResponse.credential ? 'Present' : 'Missing');
+    const response = await api.post("/google-auth/", { credential: credentialResponse.credential });
+    
+    if (response.status === 200 && response.data.success) {
+      console.log("Google authentication successful:", response.data);
+      dispatch(loginSuccess({
+        user: response.data.user,
+        accessToken: response.data.access,
+        refreshToken: response.data.refresh,
+        isGoogleAuth: true
+      }));
+
+      // Call success callback or redirect
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.push('/dashboard');
+      }
+    } else {
+      const errorMessage = response.data.error || 'Google authentication failed';
+      if (onError) {
+        onError(errorMessage);
+      } else {
+        console.error('Google Login failed:', errorMessage);
+      }
+    }
+    return response;
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.error || 'Network error during Google authentication';
+    if (onError) {
+      onError(errorMessage);
+    } else {
+      console.error('Google Login error:', error);
+    }
+    throw error;
   }
 };
 

@@ -21,12 +21,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-fsga(e3()j(z=uusm3x1*)9&n3ntm%&$ht8(crg3(plzfk7@&2'
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fallback-key-for-dev-only')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost'] # React dev server
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 # Application definition
 
@@ -79,13 +79,11 @@ SIMPLE_JWT = {
 }
 
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-]
+CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
 
-CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = not DEBUG  # Only secure in production
 CSRF_COOKIE_HTTPONLY = False
-CSRF_TRUSTED_ORIGINS = ['http://localhost:3000']  # Allow CSRF checks from this origin
+CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000').split(',')
 
 AUTH_USER_MODEL = 'api.CustomUser'
 
@@ -119,7 +117,7 @@ DATABASES = {
         'NAME': os.getenv('DATABASE_NAME', 'default_db_name'),
         'USER': os.getenv('DATABASE_USER', 'default_user'),
         'PASSWORD': os.getenv('DATABASE_PASSWORD', 'default_password'),
-        'HOST': os.getenv('DOCKER_DATABASE_HOST') if os.getenv('DOCKER_ENV') == 'true' else os.getenv('LOCAL_DATABASE_HOST', 'localhost'),
+        'HOST': os.getenv('DATABASE_HOST', 'localhost'),  # Use DATABASE_HOST from environment
         'PORT': os.getenv('DATABASE_PORT', '5432'),
     }
 }

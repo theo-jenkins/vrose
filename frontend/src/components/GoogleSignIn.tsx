@@ -1,27 +1,72 @@
-// components/GoogleSignIn.js
+import React, { useState } from 'react';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import { useDispatch } from 'react-redux';
+import { useRouter } from 'next/router';
+import { handleGoogleSuccess } from '../utils/auth';
 
-export default function GoogleSignIn() {
+interface GoogleSignInProps {
+  onSuccess?: () => void;
+  onError?: (error: string) => void;
+}
+
+const GoogleSignIn: React.FC<GoogleSignInProps> = ({ onSuccess, onError }) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const dispatch = useDispatch();
+  const router = useRouter();
+
+  const onGoogleSuccess = async (credentialResponse: any) => {
+    setIsLoading(true);
+    try {
+      await handleGoogleSuccess(credentialResponse, dispatch, router, onSuccess, onError);
+    } catch (error) {
+      // Error handling is already done in handleGoogleSuccess
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onGoogleError = () => {
+    const errorMessage = 'Google authentication cancelled or failed';
+    if (onError) {
+      onError(errorMessage);
+    } else {
+      console.error('Google Login failed');
+    }
+  };
+
+  // Get Google Client ID from environment
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+  
+  if (!googleClientId) {
+    return (
+      <div className="text-red-500 text-sm">
+        Google OAuth not configured
+      </div>
+    );
+  }
+
   return (
-    <GoogleOAuthProvider clientId="735267755465-memcani6u0bs11s1c5uq4hlefvc3fopf.apps.googleusercontent.com">
-      <GoogleLogin
-        onSuccess={async (credentialResponse) => {
-          // Sendsthe Google ID token to backend for verification and login
-          const response = await fetch('http://localhost:8000/api/auth/google/', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ token: credentialResponse.credential }),
-          });
-          const data = await response.json();
-          console.log('User logged in:', data);
-          // Store the Django session/JWT (e.g., in cookies or localStorage)
-        }}
-        onError={() => {
-          console.error('Google Login failed');
-        }}
-      />
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <div className="relative">
+        <GoogleLogin
+          onSuccess={onGoogleSuccess}
+          onError={onGoogleError}
+          useOneTap={false}
+          theme="outline"
+          size="large"
+          width="100%"
+          text="signin_with"
+          shape="rectangular"
+          disabled={isLoading}
+        />
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 rounded">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-light-accent dark:border-dark-accent"></div>
+          </div>
+        )}
+      </div>
     </GoogleOAuthProvider>
   );
-}
+};
+
+export default GoogleSignIn;

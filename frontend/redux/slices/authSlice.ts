@@ -4,13 +4,24 @@ import api from "../../src/services/api";
 // Define Auth State
 interface AuthState {
   isAuthenticated: boolean;
-  user: { id: string; email: string } | null;
+  user: { 
+    id: string; 
+    email: string; 
+    first_name: string; 
+    last_name: string; 
+  } | null;
+  accessToken?: string;
+  refreshToken?: string;
+  isGoogleAuth?: boolean;
 }
 
 // Default state (avoid accessing localStorage directly)
 const initialState: AuthState = {
   isAuthenticated: false,
   user: null,
+  accessToken: undefined,
+  refreshToken: undefined,
+  isGoogleAuth: false,
 };
 
 // Create a thunk to fetch user details
@@ -31,20 +42,42 @@ const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    loginSuccess: (state, action: PayloadAction<{ id: string; email: string }>) => {
+    loginSuccess: (state, action: PayloadAction<{ 
+      user: { id: string; email: string; first_name: string; last_name: string; };
+      accessToken?: string; 
+      refreshToken?: string; 
+      isGoogleAuth?: boolean; 
+    }>) => {
       state.isAuthenticated = true;
-      state.user = action.payload;
+      state.user = action.payload.user;
+      state.accessToken = action.payload.accessToken;
+      state.refreshToken = action.payload.refreshToken;
+      state.isGoogleAuth = action.payload.isGoogleAuth || false;
+      
       if (typeof window !== "undefined") {
-        localStorage.setItem("user", JSON.stringify(action.payload));  // Store user safely in the browser
+        localStorage.setItem("user", JSON.stringify(action.payload.user));
         localStorage.setItem("isAuthenticated", "true");
+        if (action.payload.accessToken) {
+          localStorage.setItem("accessToken", action.payload.accessToken);
+        }
+        if (action.payload.refreshToken) {
+          localStorage.setItem("refreshToken", action.payload.refreshToken);
+        }
+        localStorage.setItem("isGoogleAuth", String(state.isGoogleAuth));
       }
     },
     logoutSuccess: (state) => {
       state.isAuthenticated = false;
       state.user = null;
+      state.accessToken = undefined;
+      state.refreshToken = undefined;
+      state.isGoogleAuth = false;
       if (typeof window !== "undefined") {
-        localStorage.removeItem("user");  // Ensure localStorage is only accessed in the browser
+        localStorage.removeItem("user");
         localStorage.removeItem("isAuthenticated");
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("isGoogleAuth");
       }
     },
   },

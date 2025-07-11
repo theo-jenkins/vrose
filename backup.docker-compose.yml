@@ -1,0 +1,70 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: /backend/Dockerfile
+    container_name: django-backend
+    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+    environment:
+    - DJANGO_SETTINGS_MODULE=backend.settings
+    - DOCKER_ENV=true
+    - DOCKER_DATABASE_HOST=db
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./backend
+          target: /app/backend
+          ignore:
+            - "*.pyc"
+            - "__pycache__"
+        - action: sync+restart
+          path: ./api
+          target: /app/api
+          ignore:
+            - "*.pyc"
+            - "__pycache__"
+        - action: rebuild
+          path: requirements.txt
+
+  frontend:
+    build:
+      context: .
+      dockerfile: /frontend/Dockerfile
+    container_name: react-frontend
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./frontend
+          target: /app
+          ignore:
+            - "node_modules/"
+        - action: rebuild
+          path: package.json
+
+  db:
+    image: postgres:13
+    container_name: django-db
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME}
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

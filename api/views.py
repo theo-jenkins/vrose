@@ -1,3 +1,5 @@
+import json
+import os
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -11,7 +13,7 @@ from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from .serializers import SignUpSerializer, CustomTokenObtainPairSerializer
-from .models import DashboardFeature
+from .models import CustomUser, DashboardFeature
 
 
 # API endpoint for fetching CSRF token
@@ -35,8 +37,10 @@ class SignUpView(APIView):
             refresh = RefreshToken.for_user(user)
             data = {
                 "user": {
-                    "id": user.id,
-                    "email": user.email
+                    "id": str(user.id),
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
                 },
                 "refresh": str(refresh),
                 "access": str(refresh.access_token),
@@ -141,8 +145,10 @@ class UserDetailsView(APIView):
         user = request.user
         permissions = user.get_all_permissions()
         response = {
-            "id": user.id,
+            "id": str(user.id),
             "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
             "permissions": list(permissions)
         }
         return Response(response)
@@ -172,43 +178,72 @@ class DashboardFeaturesView(APIView):
 
         return Response({"features": features_list}, status=200)
 
-User = get_user_model()
-
+@method_decorator(csrf_protect, name='dispatch')
 class GoogleAuthView(APIView):
+    permission_classes = [AllowAny]
+    
     def post(self, request):
-        # Handle JSON data (modern approach) instead of form-data
-        try:
-            data = json.loads(request.body)
-            token = data.get('token')
-        except json.JSONDecodeError:
+
+
+        # try:
+        #     data = json.loads(request.body)
+        #     credential = data.get('credential')
+        # except json.JSONDecodeError:
+        #     return Response(
+        #         {"success": False, "error": "Invalid JSON data"},
+        #         status=status.HTTP_400_BAD_REQUEST
+        #     )
+        credential = request.data.get('credential')
+
+        if not credential:
             return Response(
-                {"success": False, "error": "Invalid JSON data"},
+                {"success": False, "error": "Credential is required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if not token:
-            return Response(
-                {"success": False, "error": "Token is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         try:
+            # Get Google Client ID from environment
+            google_client_id = os.getenv('NEXT_PUBLIC_GOOGLE_CLIENT_ID')
+            if not google_client_id:
+                return Response(
+                    {"success": False, "error": "Google OAuth not configured"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
             # Validate the Google ID token
             id_info = id_token.verify_oauth2_token(
-                token,
+                credential,
                 requests.Request(),
-                '735267755465-memcani6u0bs11s1c5uq4hlefvc3fopf.apps.googleusercontent.com'  # Replace with env var
+                google_client_id
             )
 
             # Extract user data
-            email = id_info['email']
-            name = id_info.get('name', 'No Name')
+            email = id_info.get('email')
+            name = id_info.get('name', '')
+            given_name = id_info.get('given_name', '')
+            family_name = id_info.get('family_name', '')
 
-            # Create or get user (use email as username if missing)
-            user, created = User.objects.get_or_create(
+            if not email:
+                return Response(
+                    {"success": False, "error": "Email not provided by Google"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create or get user
+            user, created = CustomUser.objects.get_or_create(
                 email=email,
-                defaults={'username': email.split('@')[0], 'first_name': name}  # Better username handling
+                defaults={
+                    'first_name': given_name,
+                    'last_name': family_name,
+                    'is_active': True,
+                }
             )
+
+            # Update user info if account already exists
+            if not created:
+                user.first_name = given_name or user.first_name
+                user.last_name = family_name or user.last_name
+                user.save()
 
             # Generate JWT tokens
             refresh = RefreshToken.for_user(user)
@@ -218,34 +253,39 @@ class GoogleAuthView(APIView):
             response_data = {
                 "success": True,
                 "user": {
-                    "id": user.id,
+                    "id": str(user.id),
                     "email": user.email,
-                    "name": name,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "name": f"{user.first_name} {user.last_name}".strip(),
                 },
                 "access": access_token,
                 "refresh": str(refresh),
+                "created": created
             }
 
-            # Set HTTP-only cookies (secure in production)
-            response = Response(
-                response_data,
-                status=status.HTTP_200_OK  # 200 is more appropriate for auth
-            )
+            # Set HTTP-only cookies
+            response = Response(response_data, status=status.HTTP_200_OK)
+            
+            # Cookie settings based on environment
+            from django.conf import settings
+            is_secure = not settings.DEBUG
+            
             response.set_cookie(
                 key='access_token',
                 value=access_token,
                 httponly=True,
-                secure=True,  # True in production (requires HTTPS)
+                secure=is_secure,
                 samesite='Lax',
-                max_age=3600 * 24,  # 1 day expiry
+                max_age=5 * 60,  # 5 minutes (match JWT settings)
             )
             response.set_cookie(
                 key='refresh_token',
                 value=str(refresh),
                 httponly=True,
-                secure=True,  # True in production
+                secure=is_secure,
                 samesite='Lax',
-                max_age=3600 * 24 * 7,  # 7 days expiry
+                max_age=24 * 60 * 60,  # 1 day (match JWT settings)
             )
 
             return response
@@ -254,4 +294,9 @@ class GoogleAuthView(APIView):
             return Response(
                 {"success": False, "error": "Invalid Google token"},
                 status=status.HTTP_401_UNAUTHORIZED
+            )
+        except Exception as e:
+            return Response(
+                {"success": False, "error": "Authentication failed"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

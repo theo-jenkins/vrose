@@ -2,66 +2,52 @@ services:
   backend:
     build:
       context: .
-      dockerfile: /backend/Dockerfile
+      dockerfile: ./backend/Dockerfile
     container_name: django-backend
     command: python manage.py runserver 0.0.0.0:8000
     ports:
       - "8000:8000"
-    volumes:
-    #  - ./backend:/app/backend:cached  # Mount the backend code
-    #  - ./api:/app/api:cached          # Mount the api code
-    #  - ./manage.py:/app/manage.py     # Include manage.py
-    #  - ./requirements.txt:/app/requirements.txt  # Include requirements file
     env_file:
       - .env
     depends_on:
       - db
     environment:
-    - DJANGO_SETTINGS_MODULE=backend.settings
-    - DOCKER_ENV=true
-    - DOCKER_DATABASE_HOST=db
-    develop:
-      watch:
-        - action: sync+restart
-          path: ./backend
-          target: /app/backend
-          ignore:
-            - "*.pyc"
-            - "__pycache__"
-        - action: sync+restart
-          path: ./api
-          target: /app/api
-          ignore:
-            - "*.pyc"
-            - "__pycache__"
-        - action: rebuild
-          path: requirements.txt
+      - DJANGO_SETTINGS_MODULE=backend.settings
+      - DOCKER_ENV=true
+      - DOCKER_DATABASE_HOST=db
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG}
+      - DATABASE_NAME=${DATABASE_NAME}
+      - DATABASE_USER=${DATABASE_USER}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - DATABASE_HOST=db
+      - DATABASE_PORT=${DATABASE_PORT}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
 
   frontend:
     build:
       context: .
-      dockerfile: /frontend/Dockerfile
+      dockerfile: ./frontend/Dockerfile
     container_name: react-frontend
     ports:
       - "3000:3000"
     stdin_open: true
-    volumes:
-    #  - ./frontend:/app:cached
+    env_file:
+      - .env
     environment:
       - CHOKIDAR_USEPOLLING=true
-    develop:
-      watch:
-        - action: sync+restart
-          path: ./frontend
-          target: /app
-          ignore:
-            - "node_modules/"
-        - action: rebuild
-          path: package.json
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
 
   db:
-    image: postgres:13
-    container_name: django-db
+    image: postgres:16
+    container_name: db
+    env_file:
+      - .env
     environment:
       POSTGRES_DB: ${DATABASE_NAME}
       POSTGRES_USER: ${DATABASE_USER}
@@ -70,6 +56,17 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: db-portal
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "8080:80"
+    depends_on:
+      - db
 
 volumes:
   postgres_data:

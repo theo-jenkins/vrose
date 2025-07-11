@@ -15,7 +15,7 @@ class SignUpSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ['email', 'confirm_email', 'password', 'confirm_password']
+        fields = ['first_name', 'last_name', 'email', 'confirm_email', 'password', 'confirm_password']
         extra_kwargs = {
             'password': {'write_only': True},  # Ensure password is write-only
         }
@@ -36,9 +36,16 @@ class SignUpSerializer(serializers.ModelSerializer):
 
         email = validated_data['email']
         password = validated_data['password']
+        first_name = validated_data.get('first_name', '')
+        last_name = validated_data.get('last_name', '')
 
         # Create the user
-        user = CustomUser.objects.create_user(email=email, password=password)
+        user = CustomUser.objects.create_user(
+            email=email, 
+            password=password,
+            first_name=first_name,
+            last_name=last_name
+        )
 
         # Grant special permissions (temporary for keyword replacement)
         special_permissions = Permission.objects.get(codename='access_all')
@@ -53,7 +60,9 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         # Include user details in the response
         data['user'] = {
-            'id': self.user.id,
+            'id': str(self.user.id),
             'email': self.user.email,
+            'first_name': self.user.first_name,
+            'last_name': self.user.last_name,
         }
         return data

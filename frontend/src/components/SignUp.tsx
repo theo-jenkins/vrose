@@ -4,6 +4,8 @@ import { fetchCsrfToken, handleSignUp } from '../utils/auth';
 import { useDispatch } from 'react-redux';
 
 interface SignUpFormData {
+  first_name: string;
+  last_name: string;
   email: string;
   confirm_email: string;
   password: string;
@@ -11,6 +13,8 @@ interface SignUpFormData {
 }
 
 export interface SignUpErrors {
+  first_name: string;
+  last_name: string;
   email: string;
   confirm_email: string;
   password: string;
@@ -26,6 +30,8 @@ const SignUp: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [formData, setFormData] = useState<SignUpFormData>({
+    first_name: '',
+    last_name: '',
     email: '',
     confirm_email: '',
     password: '',
@@ -33,6 +39,8 @@ const SignUp: React.FC = () => {
   });
   
   const [errors, setErrors] = useState<SignUpErrors>({
+    first_name: '',
+    last_name: '',
     email: '',
     confirm_email: '',
     password: '',
@@ -67,6 +75,16 @@ const SignUp: React.FC = () => {
   const validateForm = (): boolean => {
     let valid = true;
     const newErrors: Partial<SignUpErrors> = {};
+    
+    if (!formData.first_name.trim()) {
+      newErrors.first_name = 'First name is required';
+      valid = false;
+    }
+    
+    if (!formData.last_name.trim()) {
+      newErrors.last_name = 'Last name is required';
+      valid = false;
+    }
     
     if (formData.email !== formData.confirm_email) {
       newErrors.confirm_email = 'Emails do not match';
@@ -140,11 +158,45 @@ const SignUp: React.FC = () => {
           {/* Animate the additional fields container */}
           <div
             className={`overflow-hidden py-2 px-2 transition-all duration-300 ${
-              formStep === 2 ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+              formStep === 2 ? 'max-h-[700px] opacity-100' : 'max-h-0 opacity-0'
             }`}
           >
             {formStep === 2 && (
               <>
+                {/* First Name Field */}
+                <div>
+                  <label htmlFor="first_name" className="block text-sm font-medium mb-2">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    name="first_name"
+                    id="first_name"
+                    className="w-full p-3 mb-2 rounded-md bg-light-form-field dark:bg-dark-form-field placeholder-gray-400"
+                    placeholder="Enter your first name"
+                    value={formData.first_name}
+                    onChange={handleChange}
+                  />
+                  {errors.first_name && <p className="text-red-500 text-sm">{errors.first_name}</p>}
+                </div>
+
+                {/* Last Name Field */}
+                <div>
+                  <label htmlFor="last_name" className="block text-sm font-medium mb-2">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    name="last_name"
+                    id="last_name"
+                    className="w-full p-3 mb-2 rounded-md bg-light-form-field dark:bg-dark-form-field placeholder-gray-400"
+                    placeholder="Enter your last name"
+                    value={formData.last_name}
+                    onChange={handleChange}
+                  />
+                  {errors.last_name && <p className="text-red-500 text-sm">{errors.last_name}</p>}
+                </div>
+
                 {/* Confirm Email Field */}
                 <div>
                   <label htmlFor="confirm_email" className="block text-sm font-medium mb-2">

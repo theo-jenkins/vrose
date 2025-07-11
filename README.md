@@ -1,3 +1,26 @@
+# Installation Guide
+- For development!
+- Install git and configure ssh
+- git clone git@github.come:theo-jenkins/vrose.git
+
+- Create virtual environment
+- Ubuntu
+- python3 -m venv venv
+- source venv/bin/activate
+- Windows
+- python -m venv venv
+- venv/Scripts/activate
+
+- Configure docker and docker-compose
+- docker-compose up --build
+- docker-compose up
+
+- Run seperatly for hot reloading and dev
+- docker-compose start db
+- python manage.py runserver
+- npm run dev (cd frontend)
+
+
 # Completion Roadmap
 
 ---
