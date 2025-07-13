@@ -1,14 +1,14 @@
 import React from 'react';
 import TopBar from '@/components/TopBar';
-import Login from '@/components/Login';
+import SignInContainer from '@/components/SignInContainer';
 
-const LoginPage: React.FC = () => {
+const SignInPage: React.FC = () => {
     return (
         <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#161313]">
             <TopBar />
-            <Login />
+            <SignInContainer />
         </div>
     );
 };
 
-export default LoginPage;
+export default SignInPage;

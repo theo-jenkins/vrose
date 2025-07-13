@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useDispatch } from 'react-redux';
-import { fetchCsrfToken, login } from '../utils/auth';
+import { fetchCsrfToken, handleSignIn } from '../utils/auth';
 
-const Login: React.FC = () => {
+const SignIn: React.FC = () => {
   const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -32,12 +32,12 @@ const Login: React.FC = () => {
     }
 
     try {
-      const response = await login(credentials, dispatch);
+      const response = await handleSignIn(credentials, dispatch);
       if (response.status === 200) {
         router.push("/");
       }
     } catch (err) {
-      console.error("Login failed (2):", err);
+      console.error("SignIn failed:", err);
       setError("Failed to authenticate");
     } finally {
       setIsSubmitting(false);
@@ -45,14 +45,7 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#161313]">
-      <div className="w-full max-w-md bg-light-background dark:bg-dark-background text-light-text dark:text-dark-text shadow-custom-light dark:shadow-custom-dark rounded-lg p-8">
-        <h2 className="text-3xl font-semibold text-center mb-6">Sign In</h2>
-
-        {/* Divider */}
-        <hr className="my-6 h-px border-0 bg-gradient-to-r from-transparent via-[#191516] dark:via-[#FCEEF5] to-transparent opacity-100" />
-
-        <form className="space-y-6" onSubmit={handleSubmit}>
+    <form className="space-y-6" onSubmit={handleSubmit}>
           {/* Email */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium mb-2">
@@ -97,9 +90,7 @@ const Login: React.FC = () => {
             {isSubmitting ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
-      </div>
-    </div>
   );
 };
 
-export default Login;
+export default SignIn;

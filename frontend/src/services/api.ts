@@ -60,8 +60,8 @@ api.interceptors.response.use(
         // Dispatch logout action to clear Redux auth state.
         store.dispatch(logoutSuccess());
         
-        // Redirect the user to the login page.
-        window.location.href = '/auth/login';
+        // Redirect the user to the signin page.
+        window.location.href = '/auth/signin';
         return Promise.reject(refreshError);
       }
     }

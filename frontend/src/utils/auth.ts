@@ -44,15 +44,14 @@ export const handleSignUp = async (
   }
 };
 
-// Login function
-export const login = async (credentials: { email: string; password: string }, dispatch: AppDispatch) => {
-  // Clears cookies to not interfere with new login
+// Sign in function
+export const handleSignIn = async (credentials: { email: string; password: string }, dispatch: AppDispatch) => {
+  // Clears cookies to not interfere with new signin
   Cookies.remove('access_token');
   Cookies.remove('refresh_token');
   try {
-    const response = await api.post("/login/", credentials);
+    const response = await api.post("/signin/", credentials);
     if (response.status === 200) {
-      console.log("Login successful:", response.data); // Returns access and refresh tokens
       dispatch(loginSuccess({
         user: response.data.user,
         accessToken: response.data.access,
@@ -62,7 +61,7 @@ export const login = async (credentials: { email: string; password: string }, di
     }
     return response;
   } catch (error) {
-    console.error("Login failed (1):", error);
+    console.error("Sign in failed:", error);
     throw error;
   }
 };
@@ -89,7 +88,7 @@ export const handleGoogleSuccess = async (
   onSuccess?: () => void,
   onError?: (error: string) => void
 ) => {
-  // Clears cookies to not interfere with new login
+  // Clears cookies to not interfere with new signin
   Cookies.remove('access_token');
   Cookies.remove('refresh_token');
   

@@ -67,7 +67,7 @@ class SignUpView(APIView):
         
         return Response({"success": False, "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
     
-# API endpoint for user login (token issuance)
+# API endpoint for user sign in (token issuance)
 @method_decorator(csrf_protect, name='dispatch')
 class CustomTokenObtainPairView(TokenObtainPairView):
     permission_classes = [AllowAny]
@@ -183,16 +183,6 @@ class GoogleAuthView(APIView):
     permission_classes = [AllowAny]
     
     def post(self, request):
-
-
-        # try:
-        #     data = json.loads(request.body)
-        #     credential = data.get('credential')
-        # except json.JSONDecodeError:
-        #     return Response(
-        #         {"success": False, "error": "Invalid JSON data"},
-        #         status=status.HTTP_400_BAD_REQUEST
-        #     )
         credential = request.data.get('credential')
 
         if not credential:

@@ -30,7 +30,7 @@ const GoogleSignIn: React.FC<GoogleSignInProps> = ({ onSuccess, onError }) => {
     if (onError) {
       onError(errorMessage);
     } else {
-      console.error('Google Login failed');
+      console.error('Google Sign In failed');
     }
   };
 
@@ -47,20 +47,22 @@ const GoogleSignIn: React.FC<GoogleSignInProps> = ({ onSuccess, onError }) => {
 
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
-      <div className="relative">
-        <GoogleLogin
-          onSuccess={onGoogleSuccess}
-          onError={onGoogleError}
-          useOneTap={false}
-          theme="outline"
-          size="large"
-          width="100%"
-          text="signin_with"
-          shape="rectangular"
-          disabled={isLoading}
-        />
+      <div className="relative w-full">
+        <div className="w-full overflow-hidden rounded-md">
+          <GoogleLogin
+            onSuccess={onGoogleSuccess}
+            onError={onGoogleError}
+            useOneTap={false}
+            theme="outline"
+            size="large"
+            width="100%"
+            text="signin_with"
+            shape="rectangular"
+            disabled={isLoading}
+          />
+        </div>
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 rounded">
+          <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-800 bg-opacity-75 rounded-md">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-light-accent dark:border-dark-accent"></div>
           </div>
         )}

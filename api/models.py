@@ -57,11 +57,17 @@ class CustomUser(AbstractUser):
     
 # Dashboard feature model
 class DashboardFeature(models.Model):
+    # Unique identifier for each feature
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # Internal reference key ('upload_file')
     key = models.CharField(max_length=100, unique=True)
+    # Display name shown to users ('Upload File')
     title = models.CharField(max_length=100)
+    # URL path for when a feature is clicked ('/upload-file/')
     route = models.CharField(max_length=100)
+    # File name for icon ('upload_file_icon.svg')
     icon = models.CharField(max_length=100, blank=True, null=True)
+    # Permission required to access this feature (defined in CustomUser model)
     permission_code = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):

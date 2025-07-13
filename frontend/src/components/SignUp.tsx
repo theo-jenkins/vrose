@@ -121,13 +121,7 @@ const SignUp: React.FC = () => {
   };
   
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="w-full max-w-md bg-light-background dark:bg-dark-background text-light-text dark:text-dark-text shadow-custom-light dark:shadow-custom-dark rounded-lg p-8">
-        <h2 className="text-3xl font-semibold text-center mb-2">Sign Up</h2>
-        {/* Divider */}
-        <hr className="my-6 h-px border-0 bg-gradient-to-r from-transparent via-[#191516] dark:via-[#FCEEF5] to-transparent opacity-100" />
-        
-        <form className="space-y-3"onSubmit={formStep === 1 ? handleContinue : handleSubmit}>
+    <form className="space-y-3" onSubmit={formStep === 1 ? handleContinue : handleSubmit}>
           {/* Always render the email field */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium mb-2">
@@ -145,13 +139,13 @@ const SignUp: React.FC = () => {
             {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
           </div>
           
-          {/* If still on step 1, show only the "Continue" button */}
+          {/* If still on step 1, show only the "Sign Up" button */}
           {formStep === 1 && (
             <button
               type="submit"
               className="w-full py-3 bg-light-primary-button dark:bg-dark-primary-button text-[#191516] font-semibold rounded-md hover:scale-105 transition-all duration:300 focus:outline-none"
             >
-              Continue
+              Sign Up
             </button>
           )}
           
@@ -163,6 +157,26 @@ const SignUp: React.FC = () => {
           >
             {formStep === 2 && (
               <>
+                {/* Confirm Email Field */}
+                <div>
+                  <label htmlFor="confirm_email" className="block text-sm font-medium mb-2">
+                    Confirm Email
+                  </label>
+                  <input
+                    type="email"
+                    name="confirm_email"
+                    id="confirm_email"
+                    className="w-full p-3 mb-2 rounded-md bg-light-form-field dark:bg-dark-form-field placeholder-gray-400"
+                    placeholder="Confirm your email"
+                    value={formData.confirm_email}
+                    onChange={handleChange}
+                  />
+                  {errors.confirm_email && <p className="text-red-500 text-sm">{errors.confirm_email}</p>}
+                </div>
+
+                {/* Divider */}
+                <hr className="my-4 h-px border-0 bg-gradient-to-r from-transparent via-[#191516] dark:via-[#FCEEF5] to-transparent opacity-100" />
+
                 {/* First Name Field */}
                 <div>
                   <label htmlFor="first_name" className="block text-sm font-medium mb-2">
@@ -195,23 +209,6 @@ const SignUp: React.FC = () => {
                     onChange={handleChange}
                   />
                   {errors.last_name && <p className="text-red-500 text-sm">{errors.last_name}</p>}
-                </div>
-
-                {/* Confirm Email Field */}
-                <div>
-                  <label htmlFor="confirm_email" className="block text-sm font-medium mb-2">
-                    Confirm Email
-                  </label>
-                  <input
-                    type="email"
-                    name="confirm_email"
-                    id="confirm_email"
-                    className="w-full p-3 mb-2 rounded-md bg-light-form-field dark:bg-dark-form-field placeholder-gray-400"
-                    placeholder="Confirm your email"
-                    value={formData.confirm_email}
-                    onChange={handleChange}
-                  />
-                  {errors.confirm_email && <p className="text-red-500 text-sm">{errors.confirm_email}</p>}
                 </div>
 
                 {/* Divider */}
@@ -264,8 +261,6 @@ const SignUp: React.FC = () => {
             )}
           </div>
         </form>
-      </div>
-    </div>
   );
 };
 

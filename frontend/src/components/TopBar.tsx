@@ -61,12 +61,12 @@ const TopBar: React.FC = () => {
                         </button>
                     ) : (
                         <>
-                            {currentPage !== '/auth/login' && (
-                                <Link href="/auth/login">
+                            {currentPage !== '/auth/signin' && (
+                                <Link href="/auth/signin">
                                     <button className="font-semibold shadow-custom-light dark:shadow-custom-dark
                                                     text-light-text dark:text-dark-text px-2 py-1 rounded-md 
                                                     hover:scale-110 transition-all duration-300">
-                                        Login
+                                        Sign In
                                     </button>
                                 </Link>
                             )}
