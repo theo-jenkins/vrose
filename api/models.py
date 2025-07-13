@@ -72,3 +72,181 @@ class DashboardFeature(models.Model):
 
     def __str__(self):
         return self.title
+
+# Temporary file upload model for staging uploads before user confirmation
+class TemporaryUpload(models.Model):
+    UPLOAD_STATUS_CHOICES = [
+        ('uploaded', 'Uploaded'),
+        ('validated', 'Validated'),
+        ('confirmed', 'Confirmed'),
+        ('processing', 'Processing'),
+        ('failed', 'Failed'),
+        ('expired', 'Expired'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    original_filename = models.CharField(max_length=255)
+    file_path = models.CharField(max_length=500)  # Path to temporarily stored file
+    file_size = models.BigIntegerField()  # File size in bytes
+    file_type = models.CharField(max_length=50)  # csv, xlsx, xls
+    status = models.CharField(max_length=20, choices=UPLOAD_STATUS_CHOICES, default='uploaded')
+    
+    # Preview data (JSON field for storing sample rows)
+    preview_data = models.JSONField(null=True, blank=True)
+    validation_errors = models.JSONField(null=True, blank=True)  # Store any validation issues
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()  # 1 hour expiry
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"{self.original_filename} - {self.user.email}"
+
+# Processed file upload model for confirmed and processed files
+class ProcessedUpload(models.Model):
+    PROCESSING_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    temporary_upload = models.OneToOneField(TemporaryUpload, on_delete=models.CASCADE, null=True, blank=True)
+    
+    original_filename = models.CharField(max_length=255)
+    processed_file_path = models.CharField(max_length=500)  # Path to processed/stored file
+    file_size = models.BigIntegerField()
+    file_type = models.CharField(max_length=50)
+    
+    # Processing metadata
+    processing_status = models.CharField(max_length=20, choices=PROCESSING_STATUS_CHOICES, default='pending')
+    row_count = models.IntegerField(null=True, blank=True)
+    column_count = models.IntegerField(null=True, blank=True)
+    processing_errors = models.JSONField(null=True, blank=True)
+    
+    # Celery task tracking
+    celery_task_id = models.CharField(max_length=255, null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"Processed: {self.original_filename} - {self.user.email}"
+
+# Dynamic user data tables for imported data
+class UserDataTable(models.Model):
+    IMPORT_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    processed_upload = models.OneToOneField(ProcessedUpload, on_delete=models.CASCADE)
+    
+    # Table information
+    table_name = models.CharField(max_length=255, unique=True)
+    display_name = models.CharField(max_length=255)
+    
+    # Column information
+    selected_columns = models.JSONField()  # List of selected column names
+    column_mapping = models.JSONField()    # Original column names -> cleaned names mapping
+    column_types = models.JSONField()      # Column name -> detected data type mapping
+    
+    # Import progress tracking
+    import_status = models.CharField(max_length=20, choices=IMPORT_STATUS_CHOICES, default='pending')
+    total_rows = models.IntegerField(null=True, blank=True)
+    processed_rows = models.IntegerField(default=0)
+    
+    # Task tracking
+    celery_task_id = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"{self.display_name} - {self.user.email}"
+    
+    @property
+    def progress_percentage(self):
+        if not self.total_rows or self.total_rows == 0:
+            return 0
+        return min(100, round((self.processed_rows / self.total_rows) * 100, 1))
+    
+    def generate_table_name(self):
+        """Generate unique table name for this import"""
+        import re
+        from django.utils import timezone
+        
+        # Clean filename for use in table name
+        clean_filename = re.sub(r'[^a-zA-Z0-9_]', '_', self.processed_upload.original_filename)
+        clean_filename = re.sub(r'_+', '_', clean_filename).strip('_')
+        
+        # Remove file extension
+        if '.' in clean_filename:
+            clean_filename = clean_filename.rsplit('.', 1)[0]
+        
+        # Create timestamp
+        timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+        
+        # Generate table name
+        table_name = f"user_{self.user.id}_{clean_filename}_{timestamp}"
+
+        # Replace hyphens
+        table_name = table_name.replace('-', '_')
+        
+        # Ensure it's not too long (PostgreSQL limit is 63 characters)
+        if len(table_name) > 60:
+            table_name = f"user_{self.user.id}_{timestamp}"
+        
+        return table_name.lower()
+
+# Track individual import tasks for progress monitoring
+class ImportTask(models.Model):
+    TASK_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('running', 'Running'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    data_table = models.ForeignKey(UserDataTable, on_delete=models.CASCADE)
+    
+    # Task information
+    celery_task_id = models.CharField(max_length=255, unique=True)
+    task_name = models.CharField(max_length=255)
+    status = models.CharField(max_length=20, choices=TASK_STATUS_CHOICES, default='pending')
+    
+    # Progress tracking
+    current_step = models.IntegerField(default=0)
+    total_steps = models.IntegerField(default=0)
+    progress_message = models.CharField(max_length=500, blank=True)
+    
+    # Timing
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    
+    # Error handling
+    error_message = models.TextField(null=True, blank=True)
+    retry_count = models.IntegerField(default=0)
+    
+    def __str__(self):
+        return f"{self.task_name} - {self.status}"
+    
+    @property
+    def progress_percentage(self):
+        if not self.total_steps or self.total_steps == 0:
+            return 0
+        return min(100, round((self.current_step / self.total_steps) * 100, 1))

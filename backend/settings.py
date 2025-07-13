@@ -167,3 +167,29 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Celery Configuration Options
+CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+
+# Celery Time Zone
+CELERY_TIMEZONE = TIME_ZONE
+
+# Celery Task Configuration
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 25 minutes
+CELERY_WORKER_SEND_TASK_EVENTS = True
+CELERY_TASK_SEND_SENT_EVENT = True
+
+# Celery Beat Configuration (for periodic tasks)
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# Task Results
+CELERY_RESULT_EXPIRES = 3600  # 1 hour
+
+# Task Routing
+CELERY_TASK_ROUTES = {
+    'api.tasks.import_data_task': {'queue': 'data_import'},
+    'api.tasks.cleanup_expired_files': {'queue': 'cleanup'},
+}

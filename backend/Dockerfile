@@ -2,14 +2,17 @@
 FROM python:3.9-slim
 
 # Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Set the working directory
 WORKDIR /app
 
 # Add /app to the Python module search path
 ENV PYTHONPATH=/app
+
+# Ubuntu based dependencies
+RUN apt-get update && apt-get install -y libmagic1
 
 # Copy only requirements first (to cache dependencies)
 COPY backend/requirements.txt /app/backend/

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.models import Permission
-from .models import CustomUser
+from .models import CustomUser, TemporaryUpload, ProcessedUpload, UserDataTable, ImportTask
 
 # Serializer converting a custom usre model object to JSON
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -66,3 +66,101 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'last_name': self.user.last_name,
         }
         return data
+
+# File upload serializers
+class TemporaryUploadSerializer(serializers.ModelSerializer):
+    file_size_mb = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = TemporaryUpload
+        fields = [
+            'id', 'original_filename', 'file_size', 'file_size_mb', 
+            'file_type', 'status', 'preview_data', 'validation_errors',
+            'created_at', 'expires_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'expires_at']
+    
+    def get_file_size_mb(self, obj):
+        return round(obj.file_size / (1024 * 1024), 2)
+
+class ProcessedUploadSerializer(serializers.ModelSerializer):
+    file_size_mb = serializers.SerializerMethodField()
+    temporary_upload_id = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ProcessedUpload
+        fields = [
+            'id', 'original_filename', 'file_size', 'file_size_mb',
+            'file_type', 'processing_status', 'row_count', 'column_count',
+            'processing_errors', 'temporary_upload_id', 'created_at', 'processed_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'processed_at']
+    
+    def get_file_size_mb(self, obj):
+        return round(obj.file_size / (1024 * 1024), 2)
+    
+    def get_temporary_upload_id(self, obj):
+        return str(obj.temporary_upload.id) if obj.temporary_upload else None
+
+# Column Selection Serializers
+class ColumnSelectionRequestSerializer(serializers.Serializer):
+    selected_columns = serializers.ListField(
+        child=serializers.CharField(),
+        min_length=1,
+        help_text="List of column names to import"
+    )
+    
+    def validate_selected_columns(self, value):
+        if not value:
+            raise serializers.ValidationError("At least one column must be selected")
+        return value
+
+class ColumnSelectionResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    task_id = serializers.UUIDField()
+    table_name = serializers.CharField()
+    total_rows = serializers.IntegerField()
+    selected_columns = serializers.IntegerField()
+    message = serializers.CharField()
+
+# Dynamic Table Serializers
+class UserDataTableSerializer(serializers.ModelSerializer):
+    progress_percentage = serializers.ReadOnlyField()
+    file_size_mb = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = UserDataTable
+        fields = [
+            'id', 'table_name', 'display_name', 'selected_columns',
+            'column_mapping', 'column_types', 'import_status',
+            'total_rows', 'processed_rows', 'progress_percentage',
+            'created_at', 'completed_at', 'error_message', 'file_size_mb'
+        ]
+        read_only_fields = ['id', 'created_at', 'completed_at', 'progress_percentage']
+    
+    def get_file_size_mb(self, obj):
+        if obj.processed_upload:
+            return round(obj.processed_upload.file_size / (1024 * 1024), 2)
+        return 0
+
+class ImportProgressSerializer(serializers.Serializer):
+    task_id = serializers.UUIDField()
+    status = serializers.CharField()
+    current = serializers.IntegerField()
+    total = serializers.IntegerField()
+    percentage = serializers.FloatField()
+    message = serializers.CharField()
+    table_name = serializers.CharField()
+    error_message = serializers.CharField(allow_null=True)
+
+class ImportTaskSerializer(serializers.ModelSerializer):
+    progress_percentage = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = ImportTask
+        fields = [
+            'id', 'task_name', 'status', 'current_step', 'total_steps',
+            'progress_percentage', 'progress_message', 'created_at',
+            'started_at', 'completed_at', 'error_message', 'retry_count'
+        ]
+        read_only_fields = ['id', 'created_at', 'started_at', 'completed_at', 'progress_percentage']

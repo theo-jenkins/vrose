@@ -6,3 +6,9 @@ psycopg2-binary
 python-decouple
 google-auth
 requests
+pandas
+openpyxl
+xlrd
+python-magic
+celery
+redis

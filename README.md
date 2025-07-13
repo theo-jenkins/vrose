@@ -131,6 +131,7 @@ To do:
 - Adjust sizing for mobile
 - Set permissions based on product selection
 - Set .svg files to be colored based on system theme
+- Fix legacy behavior error
 - Adjust the sign up flow:
     1. User selects sign up :white_check_mark:
     2. User enters email :white_check_mark:

@@ -6,25 +6,27 @@ import TopBar from '@/components/TopBar';
 import Dashboard from '@/components/Dashboard';
 
 const DashboardIndex: React.FC = () => {
-  const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
+  const { isAuthenticated, user, isInitialized } = useSelector((state: RootState) => state.auth);
   const router = useRouter();
 
-  // Redirect to signin if not authenticated
+  // Redirect to signin if not authenticated, but only after auth is initialized
   React.useEffect(() => {
-    if (!isAuthenticated) {
+    if (isInitialized && !isAuthenticated) {
       router.push('/auth/signin');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isInitialized, router]);
 
-  // Don't render anything if not authenticated or user data is missing
-  if (!isAuthenticated || !user) {
+  // Show loading while auth is initializing or if not authenticated/no user data
+  if (!isInitialized || !isAuthenticated || !user) {
     return (
       <div className="min-h-screen flex flex-col">
         <TopBar />
         <div className="flex-grow flex items-center justify-center bg-white dark:bg-[#161313]">
           <div className="flex flex-col items-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-light-accent dark:border-dark-accent mb-4"></div>
-            <p className="text-light-text dark:text-dark-text">Redirecting to signin...</p>
+            <p className="text-light-text dark:text-dark-text">
+              {!isInitialized ? 'Loading...' : 'Redirecting to signin...'}
+            </p>
           </div>
         </div>
       </div>

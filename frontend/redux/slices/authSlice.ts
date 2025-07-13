@@ -13,6 +13,7 @@ interface AuthState {
   accessToken?: string;
   refreshToken?: string;
   isGoogleAuth?: boolean;
+  isInitialized: boolean; // Track if auth state has been loaded from storage
 }
 
 // Default state (avoid accessing localStorage directly)
@@ -22,6 +23,7 @@ const initialState: AuthState = {
   accessToken: undefined,
   refreshToken: undefined,
   isGoogleAuth: false,
+  isInitialized: false,
 };
 
 // Create a thunk to fetch user details
@@ -53,6 +55,7 @@ const authSlice = createSlice({
       state.accessToken = action.payload.accessToken;
       state.refreshToken = action.payload.refreshToken;
       state.isGoogleAuth = action.payload.isGoogleAuth || false;
+      state.isInitialized = true;
       
       if (typeof window !== "undefined") {
         localStorage.setItem("user", JSON.stringify(action.payload.user));
@@ -72,6 +75,7 @@ const authSlice = createSlice({
       state.accessToken = undefined;
       state.refreshToken = undefined;
       state.isGoogleAuth = false;
+      state.isInitialized = true;
       if (typeof window !== "undefined") {
         localStorage.removeItem("user");
         localStorage.removeItem("isAuthenticated");
@@ -79,6 +83,10 @@ const authSlice = createSlice({
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("isGoogleAuth");
       }
+    },
+    initializeAuth: (state) => {
+      // Mark auth as initialized when no stored auth is found
+      state.isInitialized = true;
     },
   },
   extraReducers: (builder) => {
@@ -89,5 +97,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { loginSuccess, logoutSuccess } = authSlice.actions;
+export const { loginSuccess, logoutSuccess, initializeAuth } = authSlice.actions;
 export default authSlice.reducer;

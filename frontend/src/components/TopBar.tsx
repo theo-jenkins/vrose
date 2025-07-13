@@ -27,7 +27,7 @@ const TopBar: React.FC = () => {
     };
 
     return (
-            <div className="fixed top-0 left-0 w-full h-[10vh] bg-light-background dark:bg-dark-background font-custom shadow-md flex items-center">
+            <div className="fixed top-0 left-0 w-full h-16 bg-light-background dark:bg-dark-background font-custom shadow-md flex items-center z-50">
                 {/* Navigation Bar */}
                 <nav className="flex items-center justify-between w-full h-full px-4">
 
