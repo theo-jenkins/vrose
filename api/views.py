@@ -1,5 +1,6 @@
 import json
 import os
+import logging
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -8,12 +9,14 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
+
+logger = logging.getLogger(__name__)
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from .serializers import SignUpSerializer, CustomTokenObtainPairSerializer
-from .models import CustomUser, DashboardFeature
+from .models import CustomUser, DashboardFeature, TableAnalysisMetadata
 
 
 # API endpoint for fetching CSRF token
@@ -714,3 +717,409 @@ class UserDataTablesView(APIView):
         return Response({
             "data_tables": serializer.data
         }, status=status.HTTP_200_OK)
+
+# Analyse Data Feature Views
+class AnalyseDataView(APIView):
+    """List user's table analysis metadata for analysis"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        from .models import TableAnalysisMetadata, UserDataTable
+        from .serializers import TableAnalysisMetadataListSerializer
+        
+        logger.info(f"User {request.user.email} requesting analyse data tables")
+        
+        # Get user's completed data tables
+        completed_data_tables = UserDataTable.objects.filter(
+            user=request.user,
+            import_status='completed'
+        ).select_related('processed_upload')
+        
+        logger.info(f"Found {completed_data_tables.count()} completed data tables for user {request.user.email}")
+        
+        # Create TableAnalysisMetadata records for any that don't exist
+        created_count = 0
+        for data_table in completed_data_tables:
+            analysis_metadata, created = TableAnalysisMetadata.objects.get_or_create(
+                user_data_table=data_table,
+                defaults={
+                    'user': request.user,
+                    'display_name': data_table.display_name,
+                    'file_path': data_table.processed_upload.processed_file_path,
+                    'file_size': data_table.processed_upload.file_size,
+                    'row_count': data_table.total_rows or 0,
+                    'headers': data_table.selected_columns
+                }
+            )
+            if created:
+                created_count += 1
+                logger.info(f"Created TableAnalysisMetadata for UserDataTable {data_table.id}")
+        
+        logger.info(f"Created {created_count} new TableAnalysisMetadata records")
+        
+        # Get user's analysis metadata
+        analysis_metadata = TableAnalysisMetadata.objects.filter(
+            user=request.user
+        ).select_related('user_data_table').prefetch_related('header_validations')
+        
+        logger.info(f"Returning {analysis_metadata.count()} analysis metadata records")
+        
+        serializer = TableAnalysisMetadataListSerializer(analysis_metadata, many=True)
+        
+        return Response({
+            "saved_tables": serializer.data,
+            "total_count": analysis_metadata.count()
+        }, status=status.HTTP_200_OK)
+
+class TableAnalysisMetadataDetailView(APIView):
+    """Get detailed information about table analysis metadata"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, table_id):
+        from .models import TableAnalysisMetadata
+        from .serializers import TableAnalysisMetadataSerializer
+        
+        try:
+            analysis_metadata = TableAnalysisMetadata.objects.get(
+                id=table_id,
+                user=request.user
+            )
+            
+            serializer = TableAnalysisMetadataSerializer(analysis_metadata)
+            
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except TableAnalysisMetadata.DoesNotExist:
+            return Response(
+                {"error": "Table analysis metadata not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+class TableAnalysisMetadataDeleteView(APIView):
+    """Delete table analysis metadata and associated user data table"""
+    permission_classes = [IsAuthenticated]
+    
+    def delete(self, request, table_id):
+        from .models import TableAnalysisMetadata
+        from django.db import transaction
+        
+        try:
+            analysis_metadata = TableAnalysisMetadata.objects.get(
+                id=table_id,
+                user=request.user
+            )
+            
+            table_name = analysis_metadata.display_name
+            user_data_table = analysis_metadata.user_data_table
+            
+            # Delete both metadata and user data table in a transaction
+            with transaction.atomic():
+                analysis_metadata.delete()
+                user_data_table.delete()
+            
+            return Response({
+                "message": f"Table '{table_name}' and all associated data deleted successfully"
+            }, status=status.HTTP_200_OK)
+            
+        except TableAnalysisMetadata.DoesNotExist:
+            return Response(
+                {"error": "Table analysis metadata not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+class HeaderValidationView(APIView):
+    """Validate headers for a saved table"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, table_id):
+        from .models import TableAnalysisMetadata, HeaderValidation
+        from .serializers import HeaderValidationRequestSerializer, HeaderValidationResponseSerializer
+        from .services.header_validator import HeaderValidator
+        from django.utils import timezone
+        import pandas as pd
+        
+        try:
+            analysis_metadata = TableAnalysisMetadata.objects.get(
+                id=table_id,
+                user=request.user
+            )
+            
+            serializer = HeaderValidationRequestSerializer(data=request.data)
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+            force_revalidate = serializer.validated_data.get('force_revalidate', False)
+            
+            # Check if already validated and not forcing revalidation
+            if analysis_metadata.is_validated and not force_revalidate:
+                return Response({
+                    "success": True,
+                    "message": "Headers already validated",
+                    "validation_results": self._get_existing_validation_results(analysis_metadata),
+                    "validation_summary": self._get_validation_summary(analysis_metadata)
+                }, status=status.HTTP_200_OK)
+            
+            # Perform header validation
+            validator = HeaderValidator()
+            headers = analysis_metadata.headers
+            
+            validation_results = validator.validate_headers(headers)
+            validation_summary = validator.get_validation_summary(validation_results)
+            
+            # Clear existing validations if revalidating
+            if force_revalidate:
+                analysis_metadata.header_validations.all().delete()
+            
+            # Save validation results
+            for header_type, result in validation_results.items():
+                HeaderValidation.objects.update_or_create(
+                    table_analysis_metadata=analysis_metadata,
+                    header_type=header_type,
+                    defaults={
+                        'matched_column': result['matched_column'],
+                        'confidence_score': result['confidence_score'],
+                        'is_found': result['is_found'],
+                        'validation_method': result['validation_method']
+                    }
+                )
+            
+            # Update analysis metadata validation status
+            analysis_metadata.is_validated = True
+            analysis_metadata.validation_completed_at = timezone.now()
+            analysis_metadata.save()
+            
+            return Response({
+                "success": True,
+                "message": "Header validation completed",
+                "validation_results": validation_results,
+                "validation_summary": validation_summary
+            }, status=status.HTTP_200_OK)
+            
+        except TableAnalysisMetadata.DoesNotExist:
+            return Response(
+                {"error": "Table analysis metadata not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Validation failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _get_existing_validation_results(self, analysis_metadata):
+        """Get existing validation results for a table"""
+        results = {}
+        validations = analysis_metadata.header_validations.all()
+        
+        for validation in validations:
+            results[validation.header_type] = {
+                'matched_column': validation.matched_column,
+                'confidence_score': validation.confidence_score,
+                'is_found': validation.is_found,
+                'validation_method': validation.validation_method
+            }
+        
+        return results
+    
+    def _get_validation_summary(self, analysis_metadata):
+        """Get validation summary for a table"""
+        validations = analysis_metadata.header_validations.all()
+        found_count = validations.filter(is_found=True).count()
+        total_count = validations.count()
+        
+        return {
+            'all_headers_found': found_count == 4,
+            'found_count': found_count,
+            'missing_count': total_count - found_count,
+            'found_headers': [
+                {
+                    'type': v.header_type,
+                    'column': v.matched_column,
+                    'confidence': v.confidence_score
+                }
+                for v in validations.filter(is_found=True)
+            ],
+            'missing_headers': [
+                v.header_type for v in validations.filter(is_found=False)
+            ],
+            'can_generate_insights': found_count == 4
+        }
+
+class GenerateInsightsView(APIView):
+    """Generate insights for a validated table"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, table_id):
+        from .models import TableAnalysisMetadata
+        
+        try:
+            analysis_metadata = TableAnalysisMetadata.objects.get(
+                id=table_id,
+                user=request.user
+            )
+            
+            # Check if table is validated and all headers found
+            if not analysis_metadata.is_validated:
+                return Response({
+                    "error": "Table headers must be validated before generating insights"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            found_headers = analysis_metadata.header_validations.filter(is_found=True).count()
+            if found_headers < 4:
+                return Response({
+                    "error": "All required headers must be found before generating insights"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # TODO: Implement actual insights generation
+            # For now, return a placeholder response
+            return Response({
+                "message": "Insights generation is not yet implemented",
+                "table_id": table_id,
+                "redirect_url": f"/feature/analyse-data/{table_id}/insights/"
+            }, status=status.HTTP_200_OK)
+            
+        except TableAnalysisMetadata.DoesNotExist:
+            return Response(
+                {"error": "Table analysis metadata not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+class CreateTableAnalysisMetadataView(APIView):
+    """Create table analysis metadata from a user data table"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        from .models import UserDataTable, TableAnalysisMetadata
+        from .serializers import TableAnalysisMetadataSerializer
+        
+        try:
+            data_table_id = request.data.get('data_table_id')
+            
+            if not data_table_id:
+                return Response(
+                    {"error": "data_table_id is required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get the user data table
+            user_data_table = UserDataTable.objects.get(
+                id=data_table_id,
+                user=request.user,
+                import_status='completed'
+            )
+            
+            # Check if analysis metadata already exists
+            if TableAnalysisMetadata.objects.filter(user_data_table=user_data_table).exists():
+                return Response(
+                    {"error": "Table analysis metadata already exists for this data table"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Create analysis metadata
+            analysis_metadata = TableAnalysisMetadata.objects.create(
+                user=request.user,
+                user_data_table=user_data_table,
+                display_name=user_data_table.display_name,
+                file_path=user_data_table.processed_upload.processed_file_path,
+                file_size=user_data_table.processed_upload.file_size,
+                row_count=user_data_table.total_rows,
+                headers=list(user_data_table.selected_columns)
+            )
+            
+            serializer = TableAnalysisMetadataSerializer(analysis_metadata)
+            
+            return Response({
+                "message": "Table analysis metadata created successfully",
+                "table_analysis_metadata": serializer.data
+            }, status=status.HTTP_201_CREATED)
+            
+        except UserDataTable.DoesNotExist:
+            return Response(
+                {"error": "User data table not found or not completed"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to create table analysis metadata: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class TableAnalysisMetadataPreviewView(APIView):
+    """Get preview data for table analysis metadata"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, table_id):
+        from .models import TableAnalysisMetadata
+        from django.db import connection
+        
+        try:
+            analysis_metadata = TableAnalysisMetadata.objects.get(
+                id=table_id,
+                user=request.user
+            )
+            
+            # Get the actual table name from the linked UserDataTable
+            table_name = analysis_metadata.user_data_table.table_name
+            
+            # Get limit from query params (default 5 for preview)
+            limit = min(int(request.GET.get('limit', 5)), 100)  # Max 100 rows
+            
+            # Query the dynamic table for preview data
+            with connection.cursor() as cursor:
+                # Get column names from the table
+                cursor.execute('''
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = %s
+                    AND column_name NOT IN ('id', 'created_at', 'updated_at')
+                    ORDER BY ordinal_position
+                ''', [table_name])
+                
+                columns = [row[0] for row in cursor.fetchall()]
+                
+                if not columns:
+                    return Response({
+                        'preview_data': [],
+                        'columns': [],
+                        'total_rows': 0
+                    }, status=status.HTTP_200_OK)
+                
+                # Get preview data
+                columns_sql = ', '.join(f'"{col}"' for col in columns)
+                cursor.execute(f'''
+                    SELECT {columns_sql}
+                    FROM "{table_name}"
+                    ORDER BY id
+                    LIMIT %s
+                ''', [limit])
+                
+                rows = cursor.fetchall()
+                
+                # Convert to list of dictionaries
+                preview_data = []
+                for row in rows:
+                    row_dict = {}
+                    for i, col in enumerate(columns):
+                        row_dict[col] = row[i]
+                    preview_data.append(row_dict)
+                
+                # Get total row count
+                cursor.execute(f'SELECT COUNT(*) FROM "{table_name}"')
+                total_rows = cursor.fetchone()[0]
+            
+            return Response({
+                'preview_data': preview_data,
+                'columns': columns,
+                'total_rows': total_rows
+            }, status=status.HTTP_200_OK)
+            
+        except TableAnalysisMetadata.DoesNotExist:
+            return Response(
+                {"error": "Table analysis metadata not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to fetch preview data: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

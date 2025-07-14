@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.models import Permission
-from .models import CustomUser, TemporaryUpload, ProcessedUpload, UserDataTable, ImportTask
+from .models import CustomUser, TemporaryUpload, ProcessedUpload, UserDataTable, ImportTask, TableAnalysisMetadata, HeaderValidation
 
 # Serializer converting a custom usre model object to JSON
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -164,3 +164,85 @@ class ImportTaskSerializer(serializers.ModelSerializer):
             'started_at', 'completed_at', 'error_message', 'retry_count'
         ]
         read_only_fields = ['id', 'created_at', 'started_at', 'completed_at', 'progress_percentage']
+
+# Analyse Data Feature Serializers
+class HeaderValidationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HeaderValidation
+        fields = [
+            'id', 'header_type', 'matched_column', 'confidence_score',
+            'is_found', 'validation_method', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+class TableAnalysisMetadataSerializer(serializers.ModelSerializer):
+    header_validations = HeaderValidationSerializer(many=True, read_only=True)
+    file_size_mb = serializers.SerializerMethodField()
+    validation_summary = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = TableAnalysisMetadata
+        fields = [
+            'id', 'display_name', 'file_path', 'file_size', 'file_size_mb',
+            'row_count', 'headers', 'is_validated', 'validation_completed_at',
+            'created_at', 'updated_at', 'header_validations', 'validation_summary'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_file_size_mb(self, obj):
+        return round(obj.file_size / (1024 * 1024), 2)
+    
+    def get_validation_summary(self, obj):
+        if not obj.is_validated:
+            return None
+        
+        validations = obj.header_validations.all()
+        found_count = validations.filter(is_found=True).count()
+        total_count = validations.count()
+        
+        return {
+            'all_found': found_count == 4,  # We need 4 header types
+            'found_count': found_count,
+            'total_count': total_count,
+            'can_generate_insights': found_count == 4,
+            'missing_headers': [
+                v.header_type for v in validations.filter(is_found=False)
+            ]
+        }
+
+class TableAnalysisMetadataListSerializer(serializers.ModelSerializer):
+    file_size_mb = serializers.SerializerMethodField()
+    validation_summary = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = TableAnalysisMetadata
+        fields = [
+            'id', 'display_name', 'file_size_mb', 'row_count',
+            'is_validated', 'validation_completed_at', 'created_at',
+            'validation_summary'
+        ]
+    
+    def get_file_size_mb(self, obj):
+        return round(obj.file_size / (1024 * 1024), 2)
+    
+    def get_validation_summary(self, obj):
+        if not obj.is_validated:
+            return None
+        
+        validations = obj.header_validations.all()
+        found_count = validations.filter(is_found=True).count()
+        
+        return {
+            'all_found': found_count == 4,
+            'found_count': found_count,
+            'can_generate_insights': found_count == 4
+        }
+
+class HeaderValidationRequestSerializer(serializers.Serializer):
+    force_revalidate = serializers.BooleanField(default=False)
+
+class HeaderValidationResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    validation_results = serializers.DictField()
+    validation_summary = serializers.DictField()

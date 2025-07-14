@@ -250,3 +250,61 @@ class ImportTask(models.Model):
         if not self.total_steps or self.total_steps == 0:
             return 0
         return min(100, round((self.current_step / self.total_steps) * 100, 1))
+
+# Table analysis metadata model for analysis feature
+class TableAnalysisMetadata(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user_data_table = models.OneToOneField(UserDataTable, on_delete=models.CASCADE)
+    
+    # Table metadata
+    display_name = models.CharField(max_length=255)
+    file_path = models.CharField(max_length=500)
+    file_size = models.BigIntegerField()
+    row_count = models.IntegerField()
+    
+    # Header information
+    headers = models.JSONField()  # List of column headers
+    
+    # Validation status
+    is_validated = models.BooleanField(default=False)
+    validation_completed_at = models.DateTimeField(null=True, blank=True)
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.display_name} - {self.user.email}"
+
+# Header validation results model
+class HeaderValidation(models.Model):
+    HEADER_TYPES = [
+        ('datetime', 'Datetime'),
+        ('product_id', 'Product ID'),
+        ('quantity', 'Quantity'),
+        ('revenue', 'Revenue'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    table_analysis_metadata = models.ForeignKey(TableAnalysisMetadata, on_delete=models.CASCADE, related_name='header_validations')
+    
+    # Header validation details
+    header_type = models.CharField(max_length=20, choices=HEADER_TYPES)
+    matched_column = models.CharField(max_length=255, null=True, blank=True)
+    confidence_score = models.FloatField(null=True, blank=True)  # 0-100
+    is_found = models.BooleanField(default=False)
+    
+    # Validation metadata
+    validation_method = models.CharField(max_length=50, default='fuzzy_match')
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['table_analysis_metadata', 'header_type']
+        ordering = ['header_type']
+    
+    def __str__(self):
+        return f"{self.table_analysis_metadata.display_name} - {self.header_type}: {self.matched_column}"

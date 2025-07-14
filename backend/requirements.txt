@@ -12,3 +12,5 @@ xlrd
 python-magic
 celery
 redis
+fuzzywuzzy
+python-levenshtein
