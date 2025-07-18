@@ -90,7 +90,7 @@ const GlobalImportProgress: React.FC = () => {
             bottom: `${20 + (index * 120)}px`,
             right: '16px'
           }}
-          className="fixed z-50"
+          className="fixed z-[9999]"
         >
           <ImportProgressWidget
             taskId={taskId}

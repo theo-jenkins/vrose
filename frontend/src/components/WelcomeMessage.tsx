@@ -13,7 +13,7 @@ const WelcomeMessage = () => {
 
                 {/* Welcome Text */}
                 <h1 className="text-3xl text-center">
-                    Welcome to Vrose, your personal AI assistant for all things related to the Vrose platform!
+                    Welcome to Vrose Labs, your personal AI assistant for all things related to the Vrose platform!
                     <br />
                     <span className="text-xl text-gray-500 dark:text-gray-400">
                         Start by creating a new project or exploring existing ones.

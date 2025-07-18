@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.db import transaction
 
-from .models import UserDataTable, ImportTask, TemporaryUpload
+from .models import ImportedDataMetadata, ImportTask, TemporaryUpload
 from .utils.dynamic_tables import DynamicTableManager, analyze_file_for_import
 
 logger = logging.getLogger(__name__)
@@ -21,11 +21,11 @@ def import_data_task(self, data_table_id: str):
     Background task to import data from uploaded file into dynamic table
     
     Args:
-        data_table_id: UUID of the UserDataTable to process
+        data_table_id: UUID of the ImportedDataMetadata to process
     """
     try:
         # Get the data table record
-        data_table = UserDataTable.objects.get(id=data_table_id)
+        data_table = ImportedDataMetadata.objects.get(id=data_table_id)
         
         # Create import task tracking record
         import_task = ImportTask.objects.create(
@@ -95,8 +95,8 @@ def import_data_task(self, data_table_id: str):
                 'error': progress_data.get('error', 'Unknown error during import')
             }
             
-    except UserDataTable.DoesNotExist:
-        logger.error(f"UserDataTable not found: {data_table_id}")
+    except ImportedDataMetadata.DoesNotExist:
+        logger.error(f"ImportedDataMetadata not found: {data_table_id}")
         return {'success': False, 'error': 'Data table not found'}
     
     except Exception as e:
@@ -104,7 +104,7 @@ def import_data_task(self, data_table_id: str):
         
         # Try to update status if possible
         try:
-            data_table = UserDataTable.objects.get(id=data_table_id)
+            data_table = ImportedDataMetadata.objects.get(id=data_table_id)
             data_table.import_status = 'failed'
             data_table.error_message = f"Unexpected error: {str(e)}"
             data_table.save()
@@ -113,13 +113,13 @@ def import_data_task(self, data_table_id: str):
         
         return {'success': False, 'error': f"Unexpected error: {str(e)}"}
 
-def _process_file_import(file_path: str, data_table: UserDataTable, import_task: ImportTask, celery_task) -> Dict[str, Any]:
+def _process_file_import(file_path: str, data_table: ImportedDataMetadata, import_task: ImportTask, celery_task) -> Dict[str, Any]:
     """
     Process file import with progress tracking
     
     Args:
         file_path: Path to the file to import
-        data_table: UserDataTable instance
+        data_table: ImportedDataMetadata instance
         import_task: ImportTask instance for tracking
         celery_task: Celery task instance for progress updates
     
@@ -295,7 +295,7 @@ def cancel_import_task(data_table_id: str):
     Cancel a running import task
     """
     try:
-        data_table = UserDataTable.objects.get(id=data_table_id)
+        data_table = ImportedDataMetadata.objects.get(id=data_table_id)
         
         # Update status
         data_table.import_status = 'cancelled'
@@ -317,7 +317,7 @@ def cancel_import_task(data_table_id: str):
         
         return {'success': True, 'message': 'Import task cancelled'}
         
-    except UserDataTable.DoesNotExist:
+    except ImportedDataMetadata.DoesNotExist:
         return {'success': False, 'error': 'Data table not found'}
     except Exception as e:
         logger.error(f"Error cancelling import task: {str(e)}")

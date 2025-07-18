@@ -58,8 +58,13 @@ const UploadFilePage: React.FC = () => {
 
   const handleConfirm = (uploadId: string, selectedColumns: string[]) => {
     setUploads(prev => prev.filter(upload => upload.id !== uploadId));
-    setSuccessMessage(`Import started for ${selectedColumns.length} columns! You can navigate away - progress will be tracked in the bottom-right corner.`);
+    setSuccessMessage(`Import started for ${selectedColumns.length} columns! Redirecting to dashboard...`);
     setError('');
+    
+    // Redirect to dashboard after successful upload
+    setTimeout(() => {
+      router.push('/dashboard/');
+    }, 2000);
   };
 
   const handleDiscard = (uploadId: string) => {
@@ -204,8 +209,13 @@ const UploadFilePage: React.FC = () => {
                   2
                 </span>
                 <div>
-                  <p className="font-medium text-light-text dark:text-dark-text">Review the preview</p>
-                  <p>Check the file structure and data preview to ensure your file uploaded correctly.</p>
+                  <p className="font-medium text-light-text dark:text-dark-text">Ensure required data columns</p>
+                  <p className="mb-2">Your uploaded data must include:</p>
+                  <ul className="list-disc ml-6 space-y-1">
+                    <li><strong>Date/time column</strong> (required) - When each sale occurred</li>
+                    <li><strong>Sales/revenue column</strong> (required) - The monetary value of each transaction</li>
+                  </ul>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Recommended optional columns for better insights: Category, Promotion (boolean), Unit price</p>
                 </div>
               </div>
               
@@ -214,8 +224,18 @@ const UploadFilePage: React.FC = () => {
                   3
                 </span>
                 <div>
-                  <p className="font-medium text-light-text dark:text-dark-text">Confirm processing</p>
-                  <p>Confirm to process your file and make it available for analysis throughout the platform.</p>
+                  <p className="font-medium text-light-text dark:text-dark-text">Select columns to import</p>
+                  <p>Review the file preview and choose which columns to include in your analysis.</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-light-primary-button dark:bg-dark-primary-button text-white rounded-full flex items-center justify-center text-xs font-bold">
+                  4
+                </span>
+                <div>
+                  <p className="font-medium text-light-text dark:text-dark-text">Get AI-powered insights</p>
+                  <p>After processing, the platform generates data insights and machine learning predictions. More data features = more accurate predictions!</p>
                 </div>
               </div>
             </div>

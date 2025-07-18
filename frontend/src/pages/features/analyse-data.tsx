@@ -108,19 +108,13 @@ const AnalyseDataPage: React.FC = () => {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center">
-            <div className="w-10 h-10 mr-4 flex items-center justify-center flex-shrink-0">
-              <Image
-                src="/static/icons/analyse-data.svg"
-                alt="Analyse Data"
-                width={40}
-                height={40}
-                className="w-8 h-8"
-              />
-            </div>
             <div>
               <h1 className="text-3xl font-bold text-light-text dark:text-dark-text">Analyse Data</h1>
               <p className="mt-2 text-light-text dark:text-dark-text opacity-80">
                 Analyse your uploaded data tables and generate insights
+              </p>
+              <p className="mt-2 text-light-text dark:text-dark-text opacity-80">
+                Order data with valid headers are eligible for AI analysis.
               </p>
             </div>
           </div>

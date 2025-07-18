@@ -16,7 +16,7 @@ from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from .serializers import SignUpSerializer, CustomTokenObtainPairSerializer
-from .models import CustomUser, DashboardFeature, TableAnalysisMetadata
+from .models import CustomUser, DashboardFeature, ImportedDataAnalysisMetadata
 
 
 # API endpoint for fetching CSRF token
@@ -496,7 +496,7 @@ class ColumnSelectionView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request, temp_id):
-        from .models import TemporaryUpload, ProcessedUpload, UserDataTable
+        from .models import TemporaryUpload, ProcessedUpload, ImportedDataMetadata
         from .serializers import ColumnSelectionRequestSerializer, ColumnSelectionResponseSerializer
         from .utils.dynamic_tables import analyze_file_for_import, DynamicTableManager
         from django.utils import timezone
@@ -565,8 +565,8 @@ class ColumnSelectionView(APIView):
                 }
             )
             
-            # Create UserDataTable record
-            data_table = UserDataTable.objects.create(
+            # Create ImportedDataMetadata record
+            data_table = ImportedDataMetadata.objects.create(
                 user=request.user,
                 processed_upload=processed_upload,
                 table_name='',  # Will be set after generation
@@ -584,7 +584,7 @@ class ColumnSelectionView(APIView):
             # Ensure table name is unique
             counter = 1
             original_table_name = table_name
-            while UserDataTable.objects.filter(table_name=table_name).exists():
+            while ImportedDataMetadata.objects.filter(table_name=table_name).exists():
                 table_name = f"{original_table_name}_{counter}"
                 counter += 1
             
@@ -647,11 +647,11 @@ class ImportProgressView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request, task_id):
-        from .models import UserDataTable
+        from .models import ImportedDataMetadata
         from .serializers import ImportProgressSerializer
         
         try:
-            data_table = UserDataTable.objects.get(
+            data_table = ImportedDataMetadata.objects.get(
                 id=task_id,
                 user=request.user
             )
@@ -670,7 +670,7 @@ class ImportProgressView(APIView):
             serializer = ImportProgressSerializer(progress_data)
             return Response(serializer.data, status=status.HTTP_200_OK)
             
-        except UserDataTable.DoesNotExist:
+        except ImportedDataMetadata.DoesNotExist:
             return Response(
                 {"error": "Import task not found"},
                 status=status.HTTP_404_NOT_FOUND
@@ -699,20 +699,20 @@ class ImportProgressView(APIView):
         else:
             return "Unknown status"
 
-class UserDataTablesView(APIView):
+class ImportedDataMetadataView(APIView):
     """Get user's imported data tables"""
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        from .models import UserDataTable
-        from .serializers import UserDataTableSerializer
+        from .models import ImportedDataMetadata
+        from .serializers import ImportedDataMetadataSerializer
         
         # Get user's data tables
-        data_tables = UserDataTable.objects.filter(
+        data_tables = ImportedDataMetadata.objects.filter(
             user=request.user
         ).order_by('-created_at')
         
-        serializer = UserDataTableSerializer(data_tables, many=True)
+        serializer = ImportedDataMetadataSerializer(data_tables, many=True)
         
         return Response({
             "data_tables": serializer.data
@@ -724,23 +724,23 @@ class AnalyseDataView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        from .models import TableAnalysisMetadata, UserDataTable
-        from .serializers import TableAnalysisMetadataListSerializer
+        from .models import ImportedDataAnalysisMetadata, ImportedDataMetadata
+        from .serializers import ImportedDataAnalysisMetadataListSerializer
         
         logger.info(f"User {request.user.email} requesting analyse data tables")
         
         # Get user's completed data tables
-        completed_data_tables = UserDataTable.objects.filter(
+        completed_data_tables = ImportedDataMetadata.objects.filter(
             user=request.user,
             import_status='completed'
         ).select_related('processed_upload')
         
         logger.info(f"Found {completed_data_tables.count()} completed data tables for user {request.user.email}")
         
-        # Create TableAnalysisMetadata records for any that don't exist
+        # Create ImportedDataAnalysisMetadata records for any that don't exist
         created_count = 0
         for data_table in completed_data_tables:
-            analysis_metadata, created = TableAnalysisMetadata.objects.get_or_create(
+            analysis_metadata, created = ImportedDataAnalysisMetadata.objects.get_or_create(
                 user_data_table=data_table,
                 defaults={
                     'user': request.user,
@@ -753,58 +753,58 @@ class AnalyseDataView(APIView):
             )
             if created:
                 created_count += 1
-                logger.info(f"Created TableAnalysisMetadata for UserDataTable {data_table.id}")
+                logger.info(f"Created ImportedDataAnalysisMetadata for ImportedDataMetadata {data_table.id}")
         
-        logger.info(f"Created {created_count} new TableAnalysisMetadata records")
+        logger.info(f"Created {created_count} new ImportedDataAnalysisMetadata records")
         
         # Get user's analysis metadata
-        analysis_metadata = TableAnalysisMetadata.objects.filter(
+        analysis_metadata = ImportedDataAnalysisMetadata.objects.filter(
             user=request.user
         ).select_related('user_data_table').prefetch_related('header_validations')
         
         logger.info(f"Returning {analysis_metadata.count()} analysis metadata records")
         
-        serializer = TableAnalysisMetadataListSerializer(analysis_metadata, many=True)
+        serializer = ImportedDataAnalysisMetadataListSerializer(analysis_metadata, many=True)
         
         return Response({
             "saved_tables": serializer.data,
             "total_count": analysis_metadata.count()
         }, status=status.HTTP_200_OK)
 
-class TableAnalysisMetadataDetailView(APIView):
+class ImportedDataAnalysisMetadataDetailView(APIView):
     """Get detailed information about table analysis metadata"""
     permission_classes = [IsAuthenticated]
     
     def get(self, request, table_id):
-        from .models import TableAnalysisMetadata
-        from .serializers import TableAnalysisMetadataSerializer
+        from .models import ImportedDataAnalysisMetadata
+        from .serializers import ImportedDataAnalysisMetadataSerializer
         
         try:
-            analysis_metadata = TableAnalysisMetadata.objects.get(
+            analysis_metadata = ImportedDataAnalysisMetadata.objects.get(
                 id=table_id,
                 user=request.user
             )
             
-            serializer = TableAnalysisMetadataSerializer(analysis_metadata)
+            serializer = ImportedDataAnalysisMetadataSerializer(analysis_metadata)
             
             return Response(serializer.data, status=status.HTTP_200_OK)
             
-        except TableAnalysisMetadata.DoesNotExist:
+        except ImportedDataAnalysisMetadata.DoesNotExist:
             return Response(
                 {"error": "Table analysis metadata not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
 
-class TableAnalysisMetadataDeleteView(APIView):
+class ImportedDataAnalysisMetadataDeleteView(APIView):
     """Delete table analysis metadata and associated user data table"""
     permission_classes = [IsAuthenticated]
     
     def delete(self, request, table_id):
-        from .models import TableAnalysisMetadata
+        from .models import ImportedDataAnalysisMetadata
         from django.db import transaction
         
         try:
-            analysis_metadata = TableAnalysisMetadata.objects.get(
+            analysis_metadata = ImportedDataAnalysisMetadata.objects.get(
                 id=table_id,
                 user=request.user
             )
@@ -821,7 +821,7 @@ class TableAnalysisMetadataDeleteView(APIView):
                 "message": f"Table '{table_name}' and all associated data deleted successfully"
             }, status=status.HTTP_200_OK)
             
-        except TableAnalysisMetadata.DoesNotExist:
+        except ImportedDataAnalysisMetadata.DoesNotExist:
             return Response(
                 {"error": "Table analysis metadata not found"},
                 status=status.HTTP_404_NOT_FOUND
@@ -832,14 +832,14 @@ class HeaderValidationView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request, table_id):
-        from .models import TableAnalysisMetadata, HeaderValidation
+        from .models import ImportedDataAnalysisMetadata, HeaderValidation
         from .serializers import HeaderValidationRequestSerializer, HeaderValidationResponseSerializer
         from .services.header_validator import HeaderValidator
         from django.utils import timezone
         import pandas as pd
         
         try:
-            analysis_metadata = TableAnalysisMetadata.objects.get(
+            analysis_metadata = ImportedDataAnalysisMetadata.objects.get(
                 id=table_id,
                 user=request.user
             )
@@ -895,7 +895,7 @@ class HeaderValidationView(APIView):
                 "validation_summary": validation_summary
             }, status=status.HTTP_200_OK)
             
-        except TableAnalysisMetadata.DoesNotExist:
+        except ImportedDataAnalysisMetadata.DoesNotExist:
             return Response(
                 {"error": "Table analysis metadata not found"},
                 status=status.HTTP_404_NOT_FOUND
@@ -950,10 +950,10 @@ class GenerateInsightsView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request, table_id):
-        from .models import TableAnalysisMetadata
+        from .models import ImportedDataAnalysisMetadata
         
         try:
-            analysis_metadata = TableAnalysisMetadata.objects.get(
+            analysis_metadata = ImportedDataAnalysisMetadata.objects.get(
                 id=table_id,
                 user=request.user
             )
@@ -978,19 +978,19 @@ class GenerateInsightsView(APIView):
                 "redirect_url": f"/feature/analyse-data/{table_id}/insights/"
             }, status=status.HTTP_200_OK)
             
-        except TableAnalysisMetadata.DoesNotExist:
+        except ImportedDataAnalysisMetadata.DoesNotExist:
             return Response(
                 {"error": "Table analysis metadata not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
 
-class CreateTableAnalysisMetadataView(APIView):
+class CreateImportedDataAnalysisMetadataView(APIView):
     """Create table analysis metadata from a user data table"""
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
-        from .models import UserDataTable, TableAnalysisMetadata
-        from .serializers import TableAnalysisMetadataSerializer
+        from .models import ImportedDataMetadata, ImportedDataAnalysisMetadata
+        from .serializers import ImportedDataAnalysisMetadataSerializer
         
         try:
             data_table_id = request.data.get('data_table_id')
@@ -1002,21 +1002,21 @@ class CreateTableAnalysisMetadataView(APIView):
                 )
             
             # Get the user data table
-            user_data_table = UserDataTable.objects.get(
+            user_data_table = ImportedDataMetadata.objects.get(
                 id=data_table_id,
                 user=request.user,
                 import_status='completed'
             )
             
             # Check if analysis metadata already exists
-            if TableAnalysisMetadata.objects.filter(user_data_table=user_data_table).exists():
+            if ImportedDataAnalysisMetadata.objects.filter(user_data_table=user_data_table).exists():
                 return Response(
                     {"error": "Table analysis metadata already exists for this data table"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
             # Create analysis metadata
-            analysis_metadata = TableAnalysisMetadata.objects.create(
+            analysis_metadata = ImportedDataAnalysisMetadata.objects.create(
                 user=request.user,
                 user_data_table=user_data_table,
                 display_name=user_data_table.display_name,
@@ -1026,14 +1026,14 @@ class CreateTableAnalysisMetadataView(APIView):
                 headers=list(user_data_table.selected_columns)
             )
             
-            serializer = TableAnalysisMetadataSerializer(analysis_metadata)
+            serializer = ImportedDataAnalysisMetadataSerializer(analysis_metadata)
             
             return Response({
                 "message": "Table analysis metadata created successfully",
                 "table_analysis_metadata": serializer.data
             }, status=status.HTTP_201_CREATED)
             
-        except UserDataTable.DoesNotExist:
+        except ImportedDataMetadata.DoesNotExist:
             return Response(
                 {"error": "User data table not found or not completed"},
                 status=status.HTTP_404_NOT_FOUND
@@ -1044,21 +1044,21 @@ class CreateTableAnalysisMetadataView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-class TableAnalysisMetadataPreviewView(APIView):
+class ImportedDataAnalysisMetadataPreviewView(APIView):
     """Get preview data for table analysis metadata"""
     permission_classes = [IsAuthenticated]
     
     def get(self, request, table_id):
-        from .models import TableAnalysisMetadata
+        from .models import ImportedDataAnalysisMetadata
         from django.db import connection
         
         try:
-            analysis_metadata = TableAnalysisMetadata.objects.get(
+            analysis_metadata = ImportedDataAnalysisMetadata.objects.get(
                 id=table_id,
                 user=request.user
             )
             
-            # Get the actual table name from the linked UserDataTable
+            # Get the actual table name from the linked ImportedDataMetadata
             table_name = analysis_metadata.user_data_table.table_name
             
             # Get limit from query params (default 5 for preview)
@@ -1113,7 +1113,7 @@ class TableAnalysisMetadataPreviewView(APIView):
                 'total_rows': total_rows
             }, status=status.HTTP_200_OK)
             
-        except TableAnalysisMetadata.DoesNotExist:
+        except ImportedDataAnalysisMetadata.DoesNotExist:
             return Response(
                 {"error": "Table analysis metadata not found"},
                 status=status.HTTP_404_NOT_FOUND

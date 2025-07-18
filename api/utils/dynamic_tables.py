@@ -229,11 +229,13 @@ class ColumnNameSanitizer:
         if not sanitized:
             sanitized = 'unnamed_column'
         
-        # Handle reserved keywords
+        # Handle reserved keywords and system columns
         reserved_keywords = {
             'select', 'from', 'where', 'insert', 'update', 'delete', 'create', 'drop',
             'table', 'index', 'user', 'group', 'order', 'by', 'group', 'having',
-            'union', 'join', 'inner', 'outer', 'left', 'right', 'on', 'as'
+            'union', 'join', 'inner', 'outer', 'left', 'right', 'on', 'as',
+            # System columns to avoid conflicts
+            '__sys_id', '__sys_created_at', '__sys_updated_at', 'id', 'created_at', 'updated_at'
         }
         
         if sanitized in reserved_keywords:
@@ -250,14 +252,19 @@ class ColumnNameSanitizer:
         """
         Create mapping from original column names to sanitized names
         Handles duplicate names by adding suffixes
+        Avoids conflicts with system columns
         """
         mapping = {}
         used_names = set()
         
+        # Reserve system column names to avoid conflicts
+        reserved_system_names = {'__sys_id', '__sys_created_at', '__sys_updated_at'}
+        used_names.update(reserved_system_names)
+        
         for original in original_columns:
             sanitized = ColumnNameSanitizer.sanitize_column_name(original)
             
-            # Handle duplicates
+            # Handle duplicates and system column conflicts
             if sanitized in used_names:
                 counter = 1
                 base_name = sanitized
@@ -290,19 +297,19 @@ class DynamicTableManager:
                 # Build CREATE TABLE statement
                 columns_sql = []
                 
-                # Add primary key first
-                columns_sql.append('id SERIAL PRIMARY KEY')
+                # Add system primary key with unique name to avoid conflicts
+                columns_sql.append('__sys_id SERIAL PRIMARY KEY')
                 
-                # Add user data columns
+                # Add user data columns (preserve original structure)
                 for col_name, col_type in column_definitions.items():
                     # Ensure column name is quoted and type is valid
                     sanitized_col_name = col_name.replace('"', '""')  # Escape quotes
                     columns_sql.append(f'"{sanitized_col_name}" {col_type}')
                 
-                # Add standard metadata columns
+                # Add system metadata columns with unique names to avoid conflicts
                 columns_sql.extend([
-                    'created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
-                    'updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
+                    '__sys_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                    '__sys_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
                 ])
                 
                 sql = f'''
@@ -315,8 +322,8 @@ class DynamicTableManager:
                 cursor.execute(sql)
                 
                 # Create indexes for better performance (sanitize index name)
-                index_name = f'idx_{table_name}_created_at'.replace('-', '_')
-                cursor.execute(f'CREATE INDEX "{index_name}" ON "{table_name}" (created_at)')
+                index_name = f'idx_{table_name}_sys_created_at'.replace('-', '_')
+                cursor.execute(f'CREATE INDEX "{index_name}" ON "{table_name}" (__sys_created_at)')
                 
                 logger.info(f"Successfully created table: {table_name}")
                 return True

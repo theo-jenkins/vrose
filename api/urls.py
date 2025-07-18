@@ -3,9 +3,9 @@ from .views import (
     get_csrf_token, SignUpView, LogoutView, CustomTokenObtainPairView, 
     UserDetailsView, DashboardFeaturesView, GoogleAuthView,
     TemporaryFileUploadView, ConfirmUploadView, DiscardUploadView, UserUploadsView,
-    ColumnSelectionView, ImportProgressView, UserDataTablesView,
-    AnalyseDataView, TableAnalysisMetadataDetailView, TableAnalysisMetadataDeleteView, 
-    HeaderValidationView, GenerateInsightsView, CreateTableAnalysisMetadataView, TableAnalysisMetadataPreviewView
+    ColumnSelectionView, ImportProgressView, ImportedDataMetadataView, 
+    AnalyseDataView, ImportedDataAnalysisMetadataDetailView, ImportedDataAnalysisMetadataDeleteView, 
+    HeaderValidationView, GenerateInsightsView, CreateImportedDataAnalysisMetadataView, ImportedDataAnalysisMetadataPreviewView
 )
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 
@@ -29,14 +29,14 @@ urlpatterns = [
     # Column selection and data import endpoints
     path('features/upload-file/select-columns/<uuid:temp_id>/', ColumnSelectionView.as_view(), name='column_selection'),
     path('features/upload-file/import-progress/<uuid:task_id>/', ImportProgressView.as_view(), name='import_progress'),
-    path('features/upload-file/data-tables/', UserDataTablesView.as_view(), name='user_data_tables'),
+    path('features/upload-file/data-tables/', ImportedDataMetadataView.as_view(), name='user_data_tables'),
     
     # Analyse data endpoints
     path('features/analyse-data/', AnalyseDataView.as_view(), name='analyse_data'),
-    path('features/analyse-data/create/', CreateTableAnalysisMetadataView.as_view(), name='create_table_analysis_metadata'),
-    path('features/analyse-data/<uuid:table_id>/', TableAnalysisMetadataDetailView.as_view(), name='table_analysis_metadata_detail'),
-    path('features/analyse-data/<uuid:table_id>/delete/', TableAnalysisMetadataDeleteView.as_view(), name='table_analysis_metadata_delete'),
+    path('features/analyse-data/create/', CreateImportedDataAnalysisMetadataView.as_view(), name='create_table_analysis_metadata'),
+    path('features/analyse-data/<uuid:table_id>/', ImportedDataAnalysisMetadataDetailView.as_view(), name='table_analysis_metadata_detail'),
+    path('features/analyse-data/<uuid:table_id>/delete/', ImportedDataAnalysisMetadataDeleteView.as_view(), name='table_analysis_metadata_delete'),
     path('features/analyse-data/<uuid:table_id>/validate-headers/', HeaderValidationView.as_view(), name='header_validation'),
     path('features/analyse-data/<uuid:table_id>/generate-insights/', GenerateInsightsView.as_view(), name='generate_insights'),
-    path('features/analyse-data/<uuid:table_id>/preview/', TableAnalysisMetadataPreviewView.as_view(), name='table_analysis_metadata_preview'),
+    path('features/analyse-data/<uuid:table_id>/preview/', ImportedDataAnalysisMetadataPreviewView.as_view(), name='table_analysis_metadata_preview'),
 ]

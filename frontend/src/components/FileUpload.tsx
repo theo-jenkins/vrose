@@ -49,6 +49,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   const uploadFile = async (file: File): Promise<void> => {
     const fileId = Math.random().toString(36).substr(2, 9);
+    const uploadStartTime = Date.now();
     
     // Add file to upload list
     const uploadedFile: UploadedFile = {
@@ -83,6 +84,15 @@ const FileUpload: React.FC<FileUploadProps> = ({
           }
         }
       });
+
+      // Ensure minimum delay of 1 second for progress feedback
+      const uploadDuration = Date.now() - uploadStartTime;
+      const minDelay = 1000; // 1 second
+      const remainingDelay = Math.max(0, minDelay - uploadDuration);
+      
+      if (remainingDelay > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingDelay));
+      }
 
       // Update file status
       setUploadedFiles(prev => 

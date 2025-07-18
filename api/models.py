@@ -137,7 +137,7 @@ class ProcessedUpload(models.Model):
         return f"Processed: {self.original_filename} - {self.user.email}"
 
 # Dynamic user data tables for imported data
-class UserDataTable(models.Model):
+class ImportedDataMetadata(models.Model):
     IMPORT_STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('processing', 'Processing'),
@@ -221,7 +221,7 @@ class ImportTask(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    data_table = models.ForeignKey(UserDataTable, on_delete=models.CASCADE)
+    data_table = models.ForeignKey(ImportedDataMetadata, on_delete=models.CASCADE)
     
     # Task information
     celery_task_id = models.CharField(max_length=255, unique=True)
@@ -252,10 +252,10 @@ class ImportTask(models.Model):
         return min(100, round((self.current_step / self.total_steps) * 100, 1))
 
 # Table analysis metadata model for analysis feature
-class TableAnalysisMetadata(models.Model):
+class ImportedDataAnalysisMetadata(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    user_data_table = models.OneToOneField(UserDataTable, on_delete=models.CASCADE)
+    user_data_table = models.OneToOneField(ImportedDataMetadata, on_delete=models.CASCADE)
     
     # Table metadata
     display_name = models.CharField(max_length=255)
@@ -290,7 +290,7 @@ class HeaderValidation(models.Model):
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    table_analysis_metadata = models.ForeignKey(TableAnalysisMetadata, on_delete=models.CASCADE, related_name='header_validations')
+    table_analysis_metadata = models.ForeignKey(ImportedDataAnalysisMetadata, on_delete=models.CASCADE, related_name='header_validations')
     
     # Header validation details
     header_type = models.CharField(max_length=20, choices=HEADER_TYPES)

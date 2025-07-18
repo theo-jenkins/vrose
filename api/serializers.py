@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.models import Permission
-from .models import CustomUser, TemporaryUpload, ProcessedUpload, UserDataTable, ImportTask, TableAnalysisMetadata, HeaderValidation
+from .models import CustomUser, TemporaryUpload, ProcessedUpload, ImportedDataMetadata, ImportTask, ImportedDataAnalysisMetadata, HeaderValidation
 
 # Serializer converting a custom usre model object to JSON
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -124,12 +124,12 @@ class ColumnSelectionResponseSerializer(serializers.Serializer):
     message = serializers.CharField()
 
 # Dynamic Table Serializers
-class UserDataTableSerializer(serializers.ModelSerializer):
+class ImportedDataMetadataSerializer(serializers.ModelSerializer):
     progress_percentage = serializers.ReadOnlyField()
     file_size_mb = serializers.SerializerMethodField()
     
     class Meta:
-        model = UserDataTable
+        model = ImportedDataMetadata
         fields = [
             'id', 'table_name', 'display_name', 'selected_columns',
             'column_mapping', 'column_types', 'import_status',
@@ -175,13 +175,13 @@ class HeaderValidationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at']
 
-class TableAnalysisMetadataSerializer(serializers.ModelSerializer):
+class ImportedDataAnalysisMetadataSerializer(serializers.ModelSerializer):
     header_validations = HeaderValidationSerializer(many=True, read_only=True)
     file_size_mb = serializers.SerializerMethodField()
     validation_summary = serializers.SerializerMethodField()
     
     class Meta:
-        model = TableAnalysisMetadata
+        model = ImportedDataAnalysisMetadata
         fields = [
             'id', 'display_name', 'file_path', 'file_size', 'file_size_mb',
             'row_count', 'headers', 'is_validated', 'validation_completed_at',
@@ -210,12 +210,12 @@ class TableAnalysisMetadataSerializer(serializers.ModelSerializer):
             ]
         }
 
-class TableAnalysisMetadataListSerializer(serializers.ModelSerializer):
+class ImportedDataAnalysisMetadataListSerializer(serializers.ModelSerializer):
     file_size_mb = serializers.SerializerMethodField()
     validation_summary = serializers.SerializerMethodField()
     
     class Meta:
-        model = TableAnalysisMetadata
+        model = ImportedDataAnalysisMetadata
         fields = [
             'id', 'display_name', 'file_size_mb', 'row_count',
             'is_validated', 'validation_completed_at', 'created_at',
