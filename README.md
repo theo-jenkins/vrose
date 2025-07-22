@@ -134,6 +134,8 @@
 - Legacy behavior error resolution
 - Signup form validation (disable until complete) ???
 - Edit file name in file preview.
+- Find incorrect SQL queries referring to legacy model names.
+- Adjust logging for the pgadmin docker image
 
 ### 🎯 Current Sprint Focus
 **Priority 1:** Complete Stage Three refinements

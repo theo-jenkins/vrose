@@ -1,6 +1,6 @@
 import api from './api';
 
-export interface TableAnalysisMetadata {
+export interface ImportedDataAnalysisMetadata {
   id: string;
   display_name: string;
   file_path: string;
@@ -46,7 +46,7 @@ export interface HeaderValidationResponse {
 }
 
 class AnalyseDataService {
-  async getSavedTables(): Promise<{ saved_tables: TableAnalysisMetadata[]; total_count: number }> {
+  async getSavedTables(): Promise<{ saved_tables: ImportedDataAnalysisMetadata[]; total_count: number }> {
     try {
       const response = await api.get('/features/analyse-data/');
       return response.data;
@@ -56,7 +56,7 @@ class AnalyseDataService {
     }
   }
 
-  async getSavedTableDetail(tableId: string): Promise<TableAnalysisMetadata> {
+  async getSavedTableDetail(tableId: string): Promise<ImportedDataAnalysisMetadata> {
     try {
       const response = await api.get(`/features/analyse-data/${tableId}/`);
       return response.data;
@@ -105,7 +105,7 @@ class AnalyseDataService {
     }
   }
 
-  async createSavedTable(dataTableId: string): Promise<{ message: string; table_analysis_metadata: TableAnalysisMetadata }> {
+  async createSavedTable(dataTableId: string): Promise<{ message: string; table_analysis_metadata: ImportedDataAnalysisMetadata }> {
     try {
       const response = await api.post(
         '/features/analyse-data/create/',

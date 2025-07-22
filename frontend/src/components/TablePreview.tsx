@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { TableAnalysisMetadata, analyseDataService } from '../services/analyseDataService';
+import { ImportedDataAnalysisMetadata, analyseDataService } from '../services/analyseDataService';
 import { TableCellsIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 interface TablePreviewProps {
-  table: TableAnalysisMetadata;
+  table: ImportedDataAnalysisMetadata;
 }
 
 const TablePreview: React.FC<TablePreviewProps> = ({ table }) => {

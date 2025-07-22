@@ -50,7 +50,7 @@ def import_data_task(self, data_table_id: str):
         # Get file path
         file_path = os.path.join(settings.MEDIA_ROOT, data_table.processed_upload.processed_file_path)
         
-        # Read and process the file
+        # Triggers the worker function to handle the data processing
         progress_data = _process_file_import(
             file_path=file_path,
             data_table=data_table,
@@ -69,6 +69,23 @@ def import_data_task(self, data_table_id: str):
             import_task.completed_at = timezone.now()
             import_task.progress_message = f"Successfully imported {progress_data['total_imported']} rows"
             import_task.save()
+            
+            # Clean up temporary upload data after successful import
+            try:
+                temp_upload = data_table.processed_upload.temporary_upload
+                if temp_upload:
+                    # Delete temporary file
+                    temp_file_path = os.path.join(settings.MEDIA_ROOT, temp_upload.file_path)
+                    if os.path.exists(temp_file_path):
+                        os.remove(temp_file_path)
+                        logger.info(f"Deleted temporary file: {temp_file_path}")
+                    
+                    # Delete temporary upload record
+                    temp_upload.delete()
+                    logger.info(f"Deleted temporary upload record for {data_table.table_name}")
+            except Exception as e:
+                # Don't fail the import if cleanup fails
+                logger.warning(f"Failed to cleanup temporary upload for {data_table.table_name}: {str(e)}")
             
             logger.info(f"Data import completed for table {data_table.table_name}: {progress_data['total_imported']} rows")
             
@@ -243,17 +260,41 @@ def _process_file_import(file_path: str, data_table: ImportedDataMetadata, impor
 @shared_task
 def cleanup_expired_files():
     """
-    Periodic task to clean up expired temporary files
+    Periodic task to clean up expired temporary files and database records
     """
-    from .utils.file_handlers import cleanup_expired_files
-    
     try:
-        cleaned_count = cleanup_expired_files()
-        logger.info(f"Cleaned up {cleaned_count} expired files")
+        # Find expired uploads
+        expired_uploads = TemporaryUpload.objects.filter(
+            expires_at__lt=timezone.now(),
+            status__in=['uploaded', 'validated', 'failed']
+        )
+        
+        cleaned_files = 0
+        deleted_records = 0
+        
+        for upload in expired_uploads:
+            try:
+                # Delete physical file if it exists
+                temp_file_path = os.path.join(settings.MEDIA_ROOT, upload.file_path)
+                if os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
+                    cleaned_files += 1
+                    logger.info(f"Deleted expired file: {temp_file_path}")
+                
+                # Delete the database record
+                upload.delete()
+                deleted_records += 1
+                logger.info(f"Deleted expired upload record: {upload.original_filename}")
+                
+            except Exception as e:
+                logger.error(f"Error cleaning up expired upload {upload.original_filename}: {str(e)}")
+        
+        logger.info(f"Cleanup completed: {cleaned_files} files deleted, {deleted_records} records removed")
         
         return {
             'success': True,
-            'cleaned_files': cleaned_count
+            'cleaned_files': cleaned_files,
+            'deleted_records': deleted_records
         }
     except Exception as e:
         logger.error(f"Error in cleanup_expired_files task: {str(e)}")
