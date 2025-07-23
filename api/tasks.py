@@ -10,60 +10,63 @@ from django.utils import timezone
 from django.conf import settings
 from django.db import transaction
 
-from .models import ImportedDataMetadata, ImportTask, TemporaryUpload
+from .models import UserDataset, ImportTask, TemporaryUpload
 from .utils.dynamic_tables import DynamicTableManager, analyze_file_for_import
 
 logger = logging.getLogger(__name__)
 
 @shared_task(bind=True)
-def import_data_task(self, data_table_id: str):
+def import_data_task(self, dataset_id: str):
     """
     Background task to import data from uploaded file into dynamic table
     
     Args:
-        data_table_id: UUID of the ImportedDataMetadata to process
+        dataset_id: UUID of the UserDataset to process
     """
     try:
-        # Get the data table record
-        data_table = ImportedDataMetadata.objects.get(id=data_table_id)
+        # Get the dataset record
+        dataset = UserDataset.objects.get(id=dataset_id)
         
         # Create import task tracking record
         import_task = ImportTask.objects.create(
-            user=data_table.user,
-            data_table=data_table,
+            user=dataset.user,
+            dataset=dataset,
             celery_task_id=self.request.id,
-            task_name=f"Import {data_table.display_name}",
+            task_name=f"Import {dataset.name}",
             status='running'
         )
         
-        # Update data table status
-        data_table.import_status = 'processing'
-        data_table.celery_task_id = self.request.id
-        data_table.save()
+        # Update dataset status
+        dataset.status = 'importing'
+        dataset.celery_task_id = self.request.id
+        dataset.save()
         
         # Start timing
         import_task.started_at = timezone.now()
         import_task.save()
         
-        logger.info(f"Starting data import for table {data_table.table_name}")
+        logger.info(f"Starting data import for table {dataset.table_name}")
         
-        # Get file path
-        file_path = os.path.join(settings.MEDIA_ROOT, data_table.processed_upload.processed_file_path)
+        # Get file path from the temporary upload
+        temp_upload = dataset.temporary_upload
+        if not temp_upload:
+            raise ValueError("No temporary upload associated with this dataset")
+        file_path = os.path.join(settings.MEDIA_ROOT, temp_upload.file_path)
         
         # Triggers the worker function to handle the data processing
         progress_data = _process_file_import(
             file_path=file_path,
-            data_table=data_table,
+            dataset=dataset,
             import_task=import_task,
             celery_task=self
         )
         
         if progress_data['success']:
             # Mark as completed
-            data_table.import_status = 'completed'
-            data_table.processed_rows = progress_data['total_imported']
-            data_table.completed_at = timezone.now()
-            data_table.save()
+            dataset.status = 'active'
+            dataset.total_rows = progress_data['total_imported']
+            dataset.imported_at = timezone.now()
+            dataset.save()
             
             import_task.status = 'completed'
             import_task.completed_at = timezone.now()
@@ -72,7 +75,7 @@ def import_data_task(self, data_table_id: str):
             
             # Clean up temporary upload data after successful import
             try:
-                temp_upload = data_table.processed_upload.temporary_upload
+                temp_upload = dataset.temporary_upload
                 if temp_upload:
                     # Delete temporary file
                     temp_file_path = os.path.join(settings.MEDIA_ROOT, temp_upload.file_path)
@@ -82,12 +85,12 @@ def import_data_task(self, data_table_id: str):
                     
                     # Delete temporary upload record
                     temp_upload.delete()
-                    logger.info(f"Deleted temporary upload record for {data_table.table_name}")
+                    logger.info(f"Deleted temporary upload record for {dataset.table_name}")
             except Exception as e:
                 # Don't fail the import if cleanup fails
-                logger.warning(f"Failed to cleanup temporary upload for {data_table.table_name}: {str(e)}")
+                logger.warning(f"Failed to cleanup temporary upload for {dataset.table_name}: {str(e)}")
             
-            logger.info(f"Data import completed for table {data_table.table_name}: {progress_data['total_imported']} rows")
+            logger.info(f"Data import completed for table {dataset.table_name}: {progress_data['total_imported']} rows")
             
             return {
                 'success': True,
@@ -96,47 +99,47 @@ def import_data_task(self, data_table_id: str):
             }
         else:
             # Mark as failed
-            data_table.import_status = 'failed'
-            data_table.error_message = progress_data.get('error', 'Unknown error during import')
-            data_table.save()
+            dataset.status = 'failed'
+            dataset.error_details = {'error': progress_data.get('error', 'Unknown error during import')}
+            dataset.save()
             
             import_task.status = 'failed'
             import_task.error_message = progress_data.get('error', 'Unknown error during import')
             import_task.completed_at = timezone.now()
             import_task.save()
             
-            logger.error(f"Data import failed for table {data_table.table_name}: {progress_data.get('error')}")
+            logger.error(f"Data import failed for table {dataset.table_name}: {progress_data.get('error')}")
             
             return {
                 'success': False,
                 'error': progress_data.get('error', 'Unknown error during import')
             }
             
-    except ImportedDataMetadata.DoesNotExist:
-        logger.error(f"ImportedDataMetadata not found: {data_table_id}")
-        return {'success': False, 'error': 'Data table not found'}
+    except UserDataset.DoesNotExist:
+        logger.error(f"UserDataset not found: {dataset_id}")
+        return {'success': False, 'error': 'Dataset not found'}
     
     except Exception as e:
         logger.error(f"Unexpected error in import_data_task: {str(e)}")
         
         # Try to update status if possible
         try:
-            data_table = ImportedDataMetadata.objects.get(id=data_table_id)
-            data_table.import_status = 'failed'
-            data_table.error_message = f"Unexpected error: {str(e)}"
-            data_table.save()
+            dataset = UserDataset.objects.get(id=dataset_id)
+            dataset.status = 'failed'
+            dataset.error_details = {'error': f"Unexpected error: {str(e)}"}
+            dataset.save()
         except:
             pass
         
         return {'success': False, 'error': f"Unexpected error: {str(e)}"}
 
-def _process_file_import(file_path: str, data_table: ImportedDataMetadata, import_task: ImportTask, celery_task) -> Dict[str, Any]:
+def _process_file_import(file_path: str, dataset: UserDataset, import_task: ImportTask, celery_task) -> Dict[str, Any]:
     """
     Process file import with progress tracking
     
     Args:
         file_path: Path to the file to import
-        data_table: ImportedDataMetadata instance
+        dataset: UserDataset instance
         import_task: ImportTask instance for tracking
         celery_task: Celery task instance for progress updates
     
@@ -151,7 +154,7 @@ def _process_file_import(file_path: str, data_table: ImportedDataMetadata, impor
             df = pd.read_excel(file_path)
         
         # Filter to selected columns
-        selected_columns = data_table.selected_columns
+        selected_columns = dataset.selected_columns
         available_columns = [col for col in selected_columns if col in df.columns]
         
         if not available_columns:
@@ -165,9 +168,9 @@ def _process_file_import(file_path: str, data_table: ImportedDataMetadata, impor
         total_rows = len(df_filtered)
         
         # Update total rows if different from expected
-        if data_table.total_rows != total_rows:
-            data_table.total_rows = total_rows
-            data_table.save()
+        if dataset.total_rows != total_rows:
+            dataset.total_rows = total_rows
+            dataset.save()
         
         import_task.total_steps = total_rows
         import_task.save()
@@ -205,17 +208,17 @@ def _process_file_import(file_path: str, data_table: ImportedDataMetadata, impor
             try:
                 with transaction.atomic():
                     inserted_count, batch_errors = DynamicTableManager.insert_batch_data(
-                        table_name=data_table.table_name,
+                        table_name=dataset.table_name,
                         data=cleaned_data,
-                        column_mapping=data_table.column_mapping
+                        column_mapping=dataset.column_mapping
                     )
                     
                     total_imported += inserted_count
                     errors.extend(batch_errors)
                     
                     # Update progress
-                    data_table.processed_rows = total_imported
-                    data_table.save()
+                    dataset.total_rows = total_imported
+                    dataset.save()
                     
                     import_task.current_step = end_idx
                     import_task.progress_message = f"Imported {total_imported} of {total_rows} rows"
@@ -331,21 +334,21 @@ def cleanup_old_import_tasks():
         }
 
 @shared_task
-def cancel_import_task(data_table_id: str):
+def cancel_import_task(dataset_id: str):
     """
     Cancel a running import task
     """
     try:
-        data_table = ImportedDataMetadata.objects.get(id=data_table_id)
+        dataset = UserDataset.objects.get(id=dataset_id)
         
         # Update status
-        data_table.import_status = 'cancelled'
-        data_table.save()
+        dataset.status = 'failed'
+        dataset.save()
         
         # Update import task if exists
         try:
             import_task = ImportTask.objects.get(
-                data_table=data_table,
+                dataset=dataset,
                 status__in=['pending', 'running']
             )
             import_task.status = 'cancelled'
@@ -354,12 +357,12 @@ def cancel_import_task(data_table_id: str):
         except ImportTask.DoesNotExist:
             pass
         
-        logger.info(f"Import task cancelled for table {data_table.table_name}")
+        logger.info(f"Import task cancelled for table {dataset.table_name}")
         
         return {'success': True, 'message': 'Import task cancelled'}
         
-    except ImportedDataMetadata.DoesNotExist:
-        return {'success': False, 'error': 'Data table not found'}
+    except UserDataset.DoesNotExist:
+        return {'success': False, 'error': 'Dataset not found'}
     except Exception as e:
         logger.error(f"Error cancelling import task: {str(e)}")
         return {'success': False, 'error': str(e)}

@@ -4,14 +4,14 @@ import { useSelector } from 'react-redux';
 import Image from 'next/image';
 import TopBar from '../../components/TopBar';
 import SavedTablesGrid from '../../components/SavedTablesGrid';
-import { analyseDataService, TableAnalysisMetadata } from '../../services/analyseDataService';
+import { DatasetAnalysisMetadata, analyseDataService } from '../../services/analyseDataService';
 import { RootState } from '../../../redux/store';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 const AnalyseDataPage: React.FC = () => {
   const router = useRouter();
   const { isAuthenticated, isInitialized } = useSelector((state: RootState) => state.auth);
-  const [savedTables, setSavedTables] = useState<TableAnalysisMetadata[]>([]);
+  const [savedTables, setSavedTables] = useState<DatasetAnalysisMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +34,7 @@ const AnalyseDataPage: React.FC = () => {
       setError(null);
       console.log('Fetching saved tables...');
       
-      const data = await analyseDataService.getSavedTables();
+      const data = await analyseDataService.getDatasets();
       console.log('API Response:', data);
       console.log('Number of tables:', data.saved_tables?.length || 0);
       

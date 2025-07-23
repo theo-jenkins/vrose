@@ -1,6 +1,55 @@
 # VRose Project Documentation
 
-## 1. Development Setup & Commands
+## 1. Task Management
+
+### ✅ Completed Tasks
+- ✅ Keyword admin portal
+- ✅ Form validation with CSRF protection
+- ✅ Access and refresh token implementation
+- ✅ Logout API fix
+- ✅ Auth bar moved to top navigation
+- ✅ Theme switcher implementation
+- ✅ Login auto-fill 400 error fix
+- ✅ TopBar added to signup/login pages
+- ✅ Redux state manager integration
+- ✅ Tree hydration error fix
+- ✅ CSRF token validation
+- ✅ Custom font support (DN-Sans)
+- ✅ Keyword removal from signup/models
+- ✅ Dashboard feature permissions
+- ✅ Dashboard features table & admin panel
+- ✅ Signup form width restriction fix
+- ✅ Horizontal navigation bar implementation
+- ✅ Logout redirect and auth state fix
+- ✅ Color scheme consistency
+- ✅ Enhanced signup flow (email → continue/Google options → form)
+- ✅ Dashboard configuration (flex grid, API-driven features, icons, permissions)
+- ✅ Adjust logging for the pgadmin docker image
+
+### 🚧 In Progress Tasks
+- 🚧 Homepage visual improvements
+- 🚧 VRose logo design
+- 🚧 Welcome message enhancement
+- 🚧 'Go to dashboard' button aesthetics
+- 🚧 Expired token login handling
+- 🚧 Google signup integration
+- 🚧 Feature access control for insufficient permissions
+
+### 📋 Pending Tasks
+- Feature list page
+- Pricing page implementation
+- Support page creation
+- Mobile responsive sizing
+- Permission based access for features
+- SVG theme-based coloring
+- Legacy behavior error resolution
+- Signup form validation (disable until complete) ???
+- Edit file name during file upload
+- Find incorrect SQL queries referring to legacy model names.
+- Adjust logging for the pgadmin docker image
+- Adjust sign up serializer to set permissions accordingly, not access_all
+
+## 2. Development Setup & Commands
 
 ### Initial Setup
 **Git Configuration:**
@@ -27,7 +76,7 @@
 
 ---
 
-## 2. Project Roadmap & Progress
+## 3. Project Roadmap & Progress
 
 ### ✅ Completed Stages
 
@@ -87,57 +136,3 @@
 - SSL, domain, and monitoring configuration
 
 ---
-
-## 3. Task Management
-
-### ✅ Completed Tasks
-- ✅ Keyword admin portal
-- ✅ Form validation with CSRF protection
-- ✅ Access and refresh token implementation
-- ✅ Logout API fix
-- ✅ Auth bar moved to top navigation
-- ✅ Theme switcher implementation
-- ✅ Login auto-fill 400 error fix
-- ✅ TopBar added to signup/login pages
-- ✅ Redux state manager integration
-- ✅ Tree hydration error fix
-- ✅ CSRF token validation
-- ✅ Custom font support (DN-Sans)
-- ✅ Keyword removal from signup/models
-- ✅ Dashboard feature permissions
-- ✅ Dashboard features table & admin panel
-- ✅ Signup form width restriction fix
-- ✅ Horizontal navigation bar implementation
-- ✅ Logout redirect and auth state fix
-- ✅ Color scheme consistency
-- ✅ Enhanced signup flow (email → continue/Google options → form)
-- ✅ Dashboard configuration (flex grid, API-driven features, icons, permissions)
-
-### 🚧 In Progress Tasks
-- 🚧 Homepage visual improvements
-- 🚧 VRose logo design
-- 🚧 Welcome message enhancement
-- 🚧 'Go to dashboard' button aesthetics
-- 🚧 Expired token login handling
-- 🚧 Google signup integration
-- 🚧 Feature access control for insufficient permissions
-
-### 📋 Pending Tasks
-- Feature list page
-- Pricing page implementation
-- Support page creation
-- Relative imports conversion
-- Typewriter effect for welcome message
-- Mobile responsive sizing
-- Product-based permission system
-- SVG theme-based coloring
-- Legacy behavior error resolution
-- Signup form validation (disable until complete) ???
-- Edit file name in file preview.
-- Find incorrect SQL queries referring to legacy model names.
-- Adjust logging for the pgadmin docker image
-
-### 🎯 Current Sprint Focus
-**Priority 1:** Complete Stage Three refinements
-**Priority 2:** Begin Stage Four (Data Visualization)
-**Priority 3:** Resolve in-progress UI/UX tasks

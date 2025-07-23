@@ -1,15 +1,15 @@
 import api from './api';
 
-export interface ImportedDataAnalysisMetadata {
+export interface DatasetAnalysisMetadata {
   id: string;
-  display_name: string;
-  file_path: string;
-  file_size: number;
+  dataset_name: string;
   file_size_mb: number;
-  row_count: number;
-  headers: string[];
-  is_validated: boolean;
-  validation_completed_at: string | null;
+  is_analysis_ready: boolean;
+  analysis_validated_at: string | null;
+  required_columns_found: Record<string, any>;
+  optional_columns_found: Record<string, any>;
+  insights_generated: boolean;
+  last_analysis_run: string | null;
   created_at: string;
   updated_at: string;
   header_validations: HeaderValidation[];
@@ -46,43 +46,43 @@ export interface HeaderValidationResponse {
 }
 
 class AnalyseDataService {
-  async getSavedTables(): Promise<{ saved_tables: ImportedDataAnalysisMetadata[]; total_count: number }> {
+  async getDatasets(): Promise<{ saved_tables: DatasetAnalysisMetadata[]; total_count: number }> {
     try {
       const response = await api.get('/features/analyse-data/');
       return response.data;
     } catch (error) {
-      console.error('Error fetching table analysis metadata:', error);
+      console.error('Error fetching datasets for analysis:', error);
       throw error;
     }
   }
 
-  async getSavedTableDetail(tableId: string): Promise<ImportedDataAnalysisMetadata> {
+  async getDatasetAnalysisDetail(datasetId: string): Promise<DatasetAnalysisMetadata> {
     try {
-      const response = await api.get(`/features/analyse-data/${tableId}/`);
+      const response = await api.get(`/features/analyse-data/${datasetId}/`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching table analysis metadata detail:', error);
+      console.error('Error fetching dataset analysis metadata detail:', error);
       throw error;
     }
   }
 
-  async deleteSavedTable(tableId: string): Promise<{ message: string }> {
+  async deleteDataset(datasetId: string): Promise<{ message: string }> {
     try {
-      const response = await api.delete(`/features/analyse-data/${tableId}/delete/`);
+      const response = await api.delete(`/features/analyse-data/${datasetId}/delete/`);
       return response.data;
     } catch (error) {
-      console.error('Error deleting table analysis metadata:', error);
+      console.error('Error deleting dataset:', error);
       throw error;
     }
   }
 
   async validateHeaders(
-    tableId: string,
+    datasetId: string,
     options: HeaderValidationRequest = {}
   ): Promise<HeaderValidationResponse> {
     try {
       const response = await api.post(
-        `/features/analyse-data/${tableId}/validate-headers/`,
+        `/features/analyse-data/${datasetId}/validate-headers/`,
         options
       );
       return response.data;
@@ -92,10 +92,10 @@ class AnalyseDataService {
     }
   }
 
-  async generateInsights(tableId: string): Promise<{ message: string; table_id: string; redirect_url: string }> {
+  async generateInsights(datasetId: string): Promise<{ message: string; dataset_id: string; redirect_url: string }> {
     try {
       const response = await api.post(
-        `/features/analyse-data/${tableId}/generate-insights/`,
+        `/features/analyse-data/${datasetId}/generate-insights/`,
         {}
       );
       return response.data;
@@ -105,33 +105,21 @@ class AnalyseDataService {
     }
   }
 
-  async createSavedTable(dataTableId: string): Promise<{ message: string; table_analysis_metadata: ImportedDataAnalysisMetadata }> {
-    try {
-      const response = await api.post(
-        '/features/analyse-data/create/',
-        { data_table_id: dataTableId }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error creating table analysis metadata:', error);
-      throw error;
-    }
-  }
-
-  // Helper method to get table preview data
-  async getTablePreview(tableId: string, limit: number = 5): Promise<{
+  // Get dataset preview data
+  async getDatasetPreview(datasetId: string, limit: number = 5): Promise<{
     preview_data: any[];
     columns: string[];
     total_rows: number;
+    dataset_name: string;
   }> {
     try {
       const response = await api.get(
-        `/features/analyse-data/${tableId}/preview/`,
+        `/features/analyse-data/${datasetId}/preview/`,
         { params: { limit } }
       );
       return response.data;
     } catch (error) {
-      console.error('Error fetching table preview:', error);
+      console.error('Error fetching dataset preview:', error);
       throw error;
     }
   }

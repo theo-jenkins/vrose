@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TableAnalysisMetadata, analyseDataService } from '../services/analyseDataService';
+import { DatasetAnalysisMetadata, analyseDataService } from '../services/analyseDataService';
 import { 
   CheckCircleIcon, 
   ExclamationTriangleIcon, 
@@ -8,7 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 interface HeaderValidationStatusProps {
-  table: TableAnalysisMetadata;
+  dataset: DatasetAnalysisMetadata;
   validationData: any;
   isValidating: boolean;
   onValidationUpdate: (newValidationData: any) => void;
@@ -16,7 +16,7 @@ interface HeaderValidationStatusProps {
 }
 
 const HeaderValidationStatus: React.FC<HeaderValidationStatusProps> = ({
-  table,
+  dataset,
   validationData,
   isValidating,
   onValidationUpdate,
@@ -29,7 +29,7 @@ const HeaderValidationStatus: React.FC<HeaderValidationStatusProps> = ({
       onValidatingChange(true);
       setValidationError(null);
       
-      const response = await analyseDataService.validateHeaders(table.id, {
+      const response = await analyseDataService.validateHeaders(dataset.id, {
         force_revalidate: forceRevalidate,
       });
       
@@ -66,7 +66,7 @@ const HeaderValidationStatus: React.FC<HeaderValidationStatusProps> = ({
       );
     }
 
-    if (!table.is_validated) {
+    if (!dataset.is_analysis_ready) {
       return (
         <div className="space-y-3">
           <div className="flex items-center text-light-text dark:text-dark-text opacity-80">
