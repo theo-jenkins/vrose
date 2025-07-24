@@ -478,7 +478,7 @@ class ConfirmUploadView(APIView):
             # Queue Celery task for data import
             from .tasks import import_data_task
             task_result = import_data_task.delay(str(dataset.id))
-            dataset.celery_task_id = task_result.id
+            dataset.celery_task_id = str(task_result.id)
             dataset.save()
             
             serializer = UserDatasetSerializer(dataset)
@@ -591,7 +591,7 @@ class ImportProgressView(APIView):
                 celery_task_id = task_id
             
             # Get Celery task status if available
-            task_result = AsyncResult(celery_task_id) if celery_task_id else None
+            task_result = AsyncResult(str(celery_task_id)) if celery_task_id else None
             celery_status = task_result.status if task_result else None
             
             # Get ImportTask for detailed progress if available
@@ -733,8 +733,12 @@ class DatasetDeleteView(APIView):
     
     def delete(self, request, dataset_id):
         from .models import UserDataset
+        from .utils.dynamic_tables import DynamicTableManager
         from django.db import transaction
+        import logging
         
+        logger = logging.getLogger(__name__)
+
         try:
             dataset = UserDataset.objects.get(
                 id=dataset_id,
@@ -742,9 +746,19 @@ class DatasetDeleteView(APIView):
             )
             
             dataset_name = dataset.name
+            table_name = dataset.table_name
             
-            # Delete dataset (analysis metadata will cascade delete)
+            # Delete both the dataset records and the dynamic table
             with transaction.atomic():
+                # First delete the dynamic table
+                if table_name:
+                    try:
+                        DynamicTableManager.drop_table(table_name)
+                        logger.info(f'Dropped dynamic table: {table_name}')
+                    except Exception as e:
+                        logger.warning(f'Failed to drop dynamic table: {table_name}: {str(e)}')
+                        # Continue with deletion even if table drop fails
+                # Delete dataset record (DatasetAnalysisMetadata will cascade delete)
                 dataset.delete()
             
             return Response({

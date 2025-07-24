@@ -25,6 +25,15 @@ const TableActions: React.FC<TableActionsProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Defensive check for dataset
+  if (!dataset) {
+    return (
+      <div className="text-light-text dark:text-dark-text opacity-80 text-sm">
+        Actions not available
+      </div>
+    );
+  }
+
   const canGenerateInsights = validationData?.can_generate_insights || false;
 
   const handleDelete = async () => {
@@ -32,8 +41,8 @@ const TableActions: React.FC<TableActionsProps> = ({
       setIsDeleting(true);
       setDeleteError(null);
       
-      await analyseDataService.deleteDataset(dataset.id);
-      onDeleted(dataset.id);
+      await analyseDataService.deleteDataset(dataset.dataset_id);
+      onDeleted(dataset.dataset_id);
     } catch (error) {
       console.error('Error deleting dataset:', error);
       setDeleteError('Failed to delete dataset. Please try again.');
@@ -69,7 +78,7 @@ const TableActions: React.FC<TableActionsProps> = ({
                 Are you sure you want to delete this dataset?
               </p>
               <p className="text-sm text-light-text dark:text-dark-text opacity-80 mt-1">
-                This action cannot be undone. The dataset "{dataset.dataset_name}" will be permanently removed.
+                This action cannot be undone. The dataset "{dataset.dataset_name || 'Unknown'}" will be permanently removed.
               </p>
             </div>
           </div>

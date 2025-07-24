@@ -448,6 +448,31 @@ class DynamicTableManager:
         """Validate that table name is safe for SQL"""
         pattern = r'^[a-zA-Z][a-zA-Z0-9_]*$'
         return bool(re.match(pattern, table_name)) and len(table_name) <= 63
+    
+    @staticmethod
+    def drop_table(table_name: str) -> bool:
+        """
+        Drop a dynamic table and its associated indexes
+        
+        Args:
+            table_name: Name of the table to drop
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            with connection.cursor() as cursor:
+                # Drop the table (CASCADE will also drop indexes)
+                sql = f'DROP TABLE IF EXISTS "{table_name}" CASCADE'
+                logger.debug(f"Dropping table with SQL: {sql}")
+                cursor.execute(sql)
+                
+                logger.info(f"Successfully dropped table: {table_name}")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to drop table {table_name}: {str(e)}")
+            return False
 
 def analyze_file_for_import(file_path: str, selected_columns: List[str]) -> Dict[str, Any]:
     """

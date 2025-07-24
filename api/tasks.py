@@ -31,14 +31,14 @@ def import_data_task(self, dataset_id: str):
         import_task = ImportTask.objects.create(
             user=dataset.user,
             dataset=dataset,
-            celery_task_id=self.request.id,
+            celery_task_id=str(self.request.id),
             task_name=f"Import {dataset.name}",
             status='running'
         )
         
         # Update dataset status
         dataset.status = 'importing'
-        dataset.celery_task_id = self.request.id
+        dataset.celery_task_id = str(self.request.id)
         dataset.save()
         
         # Start timing

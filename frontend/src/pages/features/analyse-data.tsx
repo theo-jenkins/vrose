@@ -145,7 +145,7 @@ const AnalyseDataPage: React.FC = () => {
           </div>
         ) : (
           <SavedTablesGrid
-            tables={savedTables}
+            datasets={savedTables}
             onTableDeleted={handleTableDeleted}
             onGenerateInsights={handleGenerateInsights}
           />

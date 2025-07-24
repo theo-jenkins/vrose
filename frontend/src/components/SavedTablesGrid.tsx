@@ -1,24 +1,24 @@
 import React from 'react';
 import TableCard from './TableCard';
-import { TableAnalysisMetadata } from '../services/analyseDataService';
+import { DatasetAnalysisMetadata } from '../services/analyseDataService';
 
 interface SavedTablesGridProps {
-  tables: TableAnalysisMetadata[];
+  datasets: DatasetAnalysisMetadata[];
   onTableDeleted: (tableId: string) => void;
   onGenerateInsights: (tableId: string) => void;
 }
 
 const SavedTablesGrid: React.FC<SavedTablesGridProps> = ({
-  tables,
+  datasets,
   onTableDeleted,
   onGenerateInsights,
 }) => {
   return (
     <div className="space-y-6">
-      {tables.map((table) => (
+      {datasets.filter(dataset => dataset && dataset.id).map((dataset) => (
         <TableCard
-          key={table.id}
-          table={table}
+          key={dataset.id}
+          dataset={dataset}
           onDeleted={onTableDeleted}
           onGenerateInsights={onGenerateInsights}
         />

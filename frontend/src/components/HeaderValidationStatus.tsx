@@ -24,6 +24,15 @@ const HeaderValidationStatus: React.FC<HeaderValidationStatusProps> = ({
 }) => {
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  // Defensive check for dataset
+  if (!dataset) {
+    return (
+      <div className="text-light-text dark:text-dark-text opacity-80 text-sm">
+        Dataset information not available
+      </div>
+    );
+  }
+
   const handleValidateHeaders = async (forceRevalidate: boolean = false) => {
     try {
       onValidatingChange(true);

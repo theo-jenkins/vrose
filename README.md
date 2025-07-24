@@ -48,6 +48,7 @@
 - Find incorrect SQL queries referring to legacy model names.
 - Adjust logging for the pgadmin docker image
 - Adjust sign up serializer to set permissions accordingly, not access_all
+- Fix refresh token api endpoint not working correctly for google auth
 
 ## 2. Development Setup & Commands
 

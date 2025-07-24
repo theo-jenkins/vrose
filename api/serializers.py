@@ -162,13 +162,14 @@ class HeaderValidationSerializer(serializers.ModelSerializer):
 class DatasetAnalysisMetadataSerializer(serializers.ModelSerializer):
     header_validations = HeaderValidationSerializer(many=True, read_only=True)
     dataset_name = serializers.CharField(source='dataset.name', read_only=True)
+    dataset_id = serializers.CharField(source='dataset.id', read_only=True)
     file_size_mb = serializers.SerializerMethodField()
     validation_summary = serializers.SerializerMethodField()
     
     class Meta:
         model = DatasetAnalysisMetadata
         fields = [
-            'id', 'dataset_name', 'is_analysis_ready', 'analysis_validated_at',
+            'id', 'dataset_id', 'dataset_name', 'is_analysis_ready', 'analysis_validated_at',
             'required_columns_found', 'optional_columns_found', 'insights_generated',
             'last_analysis_run', 'created_at', 'updated_at', 'header_validations', 
             'validation_summary', 'file_size_mb'
@@ -198,13 +199,14 @@ class DatasetAnalysisMetadataSerializer(serializers.ModelSerializer):
 
 class DatasetAnalysisMetadataListSerializer(serializers.ModelSerializer):
     dataset_name = serializers.CharField(source='dataset.name', read_only=True)
+    dataset_id = serializers.CharField(source='dataset.id', read_only=True)
     file_size_mb = serializers.SerializerMethodField()
     validation_summary = serializers.SerializerMethodField()
     
     class Meta:
         model = DatasetAnalysisMetadata
         fields = [
-            'id', 'dataset_name', 'file_size_mb', 'is_analysis_ready',
+            'id', 'dataset_id', 'dataset_name', 'file_size_mb', 'is_analysis_ready',
             'analysis_validated_at', 'created_at', 'validation_summary'
         ]
     

@@ -24,7 +24,19 @@ const TableCard: React.FC<TableCardProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
-  const [validationData, setValidationData] = useState(dataset.validation_summary);
+  const [validationData, setValidationData] = useState(dataset?.validation_summary || null);
+
+  // Early return if dataset is not provided
+  if (!dataset) {
+    console.error('TableCard: dataset prop is undefined');
+    return (
+      <div className="bg-light-form-field dark:bg-dark-form-field rounded-lg border border-light-text/20 dark:border-dark-text/20 p-6">
+        <div className="text-light-text dark:text-dark-text opacity-80">
+          Dataset data is not available
+        </div>
+      </div>
+    );
+  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -61,18 +73,18 @@ const TableCard: React.FC<TableCardProps> = ({
           {/* Dataset info */}
           <div className="flex-1 min-w-0">
             <h3 className="text-lg font-semibold text-light-text dark:text-dark-text mb-2 truncate">
-              {dataset.dataset_name}
+              {dataset.dataset_name || 'Unnamed Dataset'}
             </h3>
             
             {/* Metadata row */}
             <div className="flex items-center space-x-6 text-sm text-light-text dark:text-dark-text opacity-80">
               <div className="flex items-center">
                 <DocumentIcon className="h-4 w-4 mr-1" />
-                <span>{dataset.file_size_mb} MB</span>
+                <span>{dataset.file_size_mb || 0} MB</span>
               </div>
               <div className="flex items-center">
                 <CalendarIcon className="h-4 w-4 mr-1" />
-                <span>{formatDate(dataset.created_at)}</span>
+                <span>{dataset.created_at ? formatDate(dataset.created_at) : 'Unknown date'}</span>
               </div>
             </div>
 

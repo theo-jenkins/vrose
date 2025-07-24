@@ -15,8 +15,20 @@ const TablePreview: React.FC<TablePreviewProps> = ({ dataset }) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPreviewData();
-  }, [dataset.id]);
+    if (dataset?.id) {
+      fetchPreviewData();
+    }
+  }, [dataset?.id]);
+
+  // Defensive check for dataset
+  if (!dataset) {
+    return (
+      <div className="flex items-center justify-center py-8 text-light-text dark:text-dark-text opacity-80">
+        <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
+        <span className="text-sm">Dataset information not available</span>
+      </div>
+    );
+  }
 
   const fetchPreviewData = async () => {
     try {

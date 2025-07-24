@@ -165,14 +165,14 @@ class UserDataset(models.Model):
         timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
         
         # Generate table name
-        table_name = f"user_{self.user.id}_{clean_filename}_{timestamp}"
+        table_name = f"user_{str(self.user.id)}_{clean_filename}_{timestamp}"
 
         # Replace hyphens
         table_name = table_name.replace('-', '_')
         
         # Ensure it's not too long (PostgreSQL limit is 63 characters)
         if len(table_name) > 60:
-            table_name = f"user_{self.user.id}_{timestamp}"
+            table_name = f"user_{str(self.user.id)}_{timestamp}"
         
         return table_name.lower()
 

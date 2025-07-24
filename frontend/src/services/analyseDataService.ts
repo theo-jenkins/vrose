@@ -2,6 +2,7 @@ import api from './api';
 
 export interface DatasetAnalysisMetadata {
   id: string;
+  dataset_id: string;
   dataset_name: string;
   file_size_mb: number;
   is_analysis_ready: boolean;
