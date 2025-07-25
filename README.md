@@ -3,7 +3,7 @@
 ## 1. Task Management
 
 ### ✅ Completed Tasks
-- ✅ Keyword admin portal
+- ✅ Admin panel; users and features
 - ✅ Form validation with CSRF protection
 - ✅ Access and refresh token implementation
 - ✅ Logout API fix
@@ -25,22 +25,22 @@
 - ✅ Enhanced signup flow (email → continue/Google options → form)
 - ✅ Dashboard configuration (flex grid, API-driven features, icons, permissions)
 - ✅ Adjust logging for the pgadmin docker image
-
-### 🚧 In Progress Tasks
-- 🚧 Homepage visual improvements
-- 🚧 VRose logo design
-- 🚧 Welcome message enhancement
-- 🚧 'Go to dashboard' button aesthetics
-- 🚧 Expired token login handling
-- 🚧 Google signup integration
-- 🚧 Feature access control for insufficient permissions
+- ✅ Google auth
+- ✅ Permission based access for features
 
 ### 📋 Pending Tasks
+- Homepage visual improvements
+- VRose logo design with animation
+- Welcome message enhancement
+- Improve font and texture of ui
+- 'Go to dashboard' button aesthetics
+- Dashboard button can replace the sign in button once auth'd
+- Expired token login handling
+- Feature access control for insufficient permissions
 - Feature list page
 - Pricing page implementation
 - Support page creation
 - Mobile responsive sizing
-- Permission based access for features
 - SVG theme-based coloring
 - Legacy behavior error resolution
 - Signup form validation (disable until complete) ???
@@ -49,6 +49,15 @@
 - Adjust logging for the pgadmin docker image
 - Adjust sign up serializer to set permissions accordingly, not access_all
 - Fix refresh token api endpoint not working correctly for google auth
+- Ensure header validation logic is future proof
+- Check header validation on temporary upload, report to user
+- Render status of header validations on the upload page
+- Now analyse dataset widget just needs 'generate insights' and 'delete'
+- Fix 'delete' endpoint not hooking all the dataset records
+- Generate insights renders a graph
+- Generate insights deploys a tensorflow model for sales analysis (LSTM)
+- User can modify the graph
+- User can view prediction
 
 ## 2. Development Setup & Commands
 
@@ -62,13 +71,8 @@
 - Windows: `python -m venv venv` → `venv/Scripts/activate`
 
 **Docker Configuration:**
-- Initial build: `docker-compose up --build`
+- Initial build: `docker-compose -f docker.compose.dev.yml up --build`
 - Standard run: `docker-compose up`
-
-**Development Mode (Hot Reloading):**
-- Database only: `docker-compose start db`
-- Backend: `python manage.py runserver`
-- Frontend: `npm run dev` (from frontend directory)
 
 **Git Workflow:**
 - Stage changes: `git add .`
