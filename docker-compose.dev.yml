@@ -108,7 +108,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
 
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: dpage/pgadmin4
     container_name: db-portal
     environment:
       - PGADMIN_DEFAULT_EMAIL=admin@admin.com

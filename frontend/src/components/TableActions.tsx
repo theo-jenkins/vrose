@@ -42,7 +42,7 @@ const TableActions: React.FC<TableActionsProps> = ({
       setDeleteError(null);
       
       await analyseDataService.deleteDataset(dataset.dataset_id);
-      onDeleted(dataset.dataset_id);
+      onDeleted(dataset.id);
     } catch (error) {
       console.error('Error deleting dataset:', error);
       setDeleteError('Failed to delete dataset. Please try again.');

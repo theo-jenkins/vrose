@@ -49,6 +49,7 @@
 - Adjust logging for the pgadmin docker image
 - Adjust sign up serializer to set permissions accordingly, not access_all
 - Fix refresh token api endpoint not working correctly for google auth
+- Repair import progress widget
 - Ensure header validation logic is future proof
 - Check header validation on temporary upload, report to user
 - Render status of header validations on the upload page

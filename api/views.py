@@ -616,11 +616,14 @@ class ImportProgressView(APIView):
                 percentage = 100 if dataset.status == 'active' else 0
                 message = self._get_progress_message(dataset)
             
+            # Map backend status to frontend status
+            frontend_status = self._get_frontend_status(dataset.status, celery_status)
+            
             return Response({
                 "success": True,
                 "task_id": str(task_id),
                 "dataset_id": str(dataset.id),
-                "status": dataset.status,
+                "status": frontend_status,
                 "celery_status": celery_status,
                 "current": current,
                 "total": total,
@@ -655,6 +658,21 @@ class ImportProgressView(APIView):
             return "Dataset has been archived"
         else:
             return f"Status: {dataset.status}"
+    
+    def _get_frontend_status(self, dataset_status, celery_status):
+        """Map backend dataset status to frontend expected status"""
+        if dataset_status == 'importing':
+            return 'processing'
+        elif dataset_status == 'active':
+            return 'completed'
+        elif dataset_status == 'failed':
+            return 'failed'
+        elif celery_status == 'PENDING':
+            return 'pending'
+        elif celery_status in ['STARTED', 'PROGRESS']:
+            return 'processing'
+        else:
+            return dataset_status
 
 
 # Analyse Data Feature Views  
@@ -954,7 +972,7 @@ class DatasetPreviewView(APIView):
                     SELECT column_name
                     FROM information_schema.columns
                     WHERE table_name = %s
-                    AND column_name NOT IN ('id', 'created_at', 'updated_at')
+                    AND column_name NOT IN ('__sys_id', '__sys_created_at', '__sys_updated_at')
                     ORDER BY ordinal_position
                 ''', [dataset.table_name])
                 
@@ -972,7 +990,7 @@ class DatasetPreviewView(APIView):
                 cursor.execute(f'''
                     SELECT {columns_sql}
                     FROM "{dataset.table_name}"
-                    ORDER BY id
+                    ORDER BY "__sys_id"
                     LIMIT %s
                 ''', [limit])
                 

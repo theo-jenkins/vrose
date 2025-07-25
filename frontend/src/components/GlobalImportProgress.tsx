@@ -54,6 +54,7 @@ export const removeGlobalImport = (taskId: string) => {
   }
 };
 
+
 const GlobalImportProgress: React.FC = () => {
   const progressManager = useImportProgressManager();
   const [activeImportsList, setActiveImportsList] = useState<string[]>([]);
@@ -77,7 +78,6 @@ const GlobalImportProgress: React.FC = () => {
   }, []);
 
   const handleImportError = useCallback((taskId: string, error: string) => {
-    console.error(`Import error for task ${taskId}:`, error);
     // Keep the widget visible for errors so user can see what went wrong
   }, []);
 

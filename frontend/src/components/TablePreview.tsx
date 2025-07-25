@@ -15,10 +15,10 @@ const TablePreview: React.FC<TablePreviewProps> = ({ dataset }) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (dataset?.id) {
+    if (dataset?.dataset_id) {
       fetchPreviewData();
     }
-  }, [dataset?.id]);
+  }, [dataset?.dataset_id]);
 
   // Defensive check for dataset
   if (!dataset) {
@@ -35,7 +35,7 @@ const TablePreview: React.FC<TablePreviewProps> = ({ dataset }) => {
       setLoading(true);
       setError(null);
       
-      const response = await analyseDataService.getDatasetPreview(dataset.id, 5);
+      const response = await analyseDataService.getDatasetPreview(dataset.dataset_id, 5);
       setPreviewData(response.preview_data);
       setColumns(response.columns);
       setTotalRows(response.total_rows);

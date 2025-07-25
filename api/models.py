@@ -211,6 +211,13 @@ class ImportTask(models.Model):
     
     def __str__(self):
         return f"{self.task_name} - {self.status}"
+    
+    @property
+    def progress_percentage(self):
+        """Calculate progress percentage based on current and total steps"""
+        if self.total_steps == 0:
+            return 0
+        return min(100, round((self.current_step / self.total_steps) * 100, 2))
 
 
 # Dataset analysis metadata model for analysis feature
