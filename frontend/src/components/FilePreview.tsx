@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { formatFileSize } from '../utils/fileValidation';
 import { addGlobalImport } from './GlobalImportProgress';
+import HeaderValidation from './HeaderValidation';
 import api from '../services/api';
 
 interface FilePreviewData {
@@ -9,6 +10,7 @@ interface FilePreviewData {
   total_rows_sample: number;
   total_columns: number;
 }
+
 
 interface TemporaryUpload {
   id: string;
@@ -44,6 +46,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({
   const [datasetName, setDatasetName] = useState<string>(
     upload.original_filename.replace(/\.[^/.]+$/, '') // Remove file extension for default name
   );
+
+  // Memoize the selected columns array to prevent unnecessary re-renders
+  const selectedColumnsArray = useMemo(() => Array.from(selectedColumns), [selectedColumns]);
 
   const toggleColumn = useCallback((column: string) => {
     setSelectedColumns(prev => {
@@ -156,6 +161,13 @@ const FilePreview: React.FC<FilePreviewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Header Validation */}
+      <HeaderValidation 
+        tempFileId={upload.id}
+        selectedColumns={selectedColumnsArray}
+        autoValidate={true}
+      />
 
       {/* Validation Errors */}
       {upload.validation_errors && upload.validation_errors.length > 0 && (

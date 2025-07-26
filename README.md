@@ -55,6 +55,9 @@
 - Render status of header validations on the upload page
 - Now analyse dataset widget just needs 'generate insights' and 'delete'
 - Fix 'delete' endpoint not hooking all the dataset records
+- Create validate headers for file preview
+- Show validate headers results on analyse data screen
+- Make validate headers much stricter
 - Generate insights renders a graph
 - Generate insights deploys a tensorflow model for sales analysis (LSTM)
 - User can modify the graph

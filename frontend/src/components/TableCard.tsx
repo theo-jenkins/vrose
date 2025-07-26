@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { DatasetAnalysisMetadata } from '../services/analyseDataService';
 import TableActions from './TableActions';
-import HeaderValidationStatus from './HeaderValidationStatus';
+import HeaderValidation from './HeaderValidation';
 import TablePreview from './TablePreview';
 import { 
   ChevronDownIcon, 
@@ -90,12 +90,10 @@ const TableCard: React.FC<TableCardProps> = ({
 
             {/* Validation status */}
             <div className="mt-3">
-              <HeaderValidationStatus
-                dataset={dataset}
-                validationData={validationData}
-                isValidating={isValidating}
-                onValidationUpdate={handleValidationUpdate}
-                onValidatingChange={setIsValidating}
+              <HeaderValidation
+                datasetId={dataset.id}
+                autoValidate={false}
+                onValidationComplete={handleValidationUpdate}
               />
             </div>
           </div>

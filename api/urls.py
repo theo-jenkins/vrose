@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     get_csrf_token, SignUpView, LogoutView, CustomTokenObtainPairView, 
     UserDetailsView, DashboardFeaturesView, GoogleAuthView,
-    TemporaryFileUploadView, ConfirmUploadView, DiscardUploadView, UserDatasetsView,
+    TemporaryFileUploadView, TemporaryFileHeaderValidationView, ConfirmUploadView, DiscardUploadView, UserDatasetsView,
     ImportProgressView, AnalyseDataView, DatasetAnalysisDetailView, DatasetDeleteView, 
     HeaderValidationView, GenerateInsightsView, DatasetPreviewView
 )
@@ -19,8 +19,9 @@ urlpatterns = [
     path('dashboard-features/', DashboardFeaturesView.as_view(), name='dashboard_features'),
     path('google-auth/', GoogleAuthView.as_view(), name='google_auth'),
     
-    # File upload endpoints (5 clean, purpose-driven endpoints)
+    # File upload endpoints (6 clean, purpose-driven endpoints)
     path('features/upload-file/temp/', TemporaryFileUploadView.as_view(), name='temp_file_upload'),
+    path('features/upload-file/temp/<uuid:temp_id>/validate-headers/', TemporaryFileHeaderValidationView.as_view(), name='temp_file_header_validation'),
     path('features/upload-file/confirm/<uuid:temp_id>/', ConfirmUploadView.as_view(), name='confirm_upload'),
     path('features/upload-file/discard/<uuid:temp_id>/', DiscardUploadView.as_view(), name='discard_upload'),
     path('features/upload-file/datasets/', UserDatasetsView.as_view(), name='user_datasets'),

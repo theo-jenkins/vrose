@@ -369,6 +369,108 @@ class TemporaryFileUploadView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+class TemporaryFileHeaderValidationView(APIView):
+    """Validate headers for a temporary uploaded file"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, temp_id):
+        from .models import TemporaryUpload
+        from .services.header_validator import HeaderValidator
+        from django.conf import settings
+        import os
+        import pandas as pd
+        
+        try:
+            # Get temporary upload
+            temp_upload = TemporaryUpload.objects.get(
+                id=temp_id,
+                user=request.user,
+                status__in=['uploaded', 'validated']
+            )
+            
+            # Check if not expired
+            from django.utils import timezone
+            if temp_upload.expires_at < timezone.now():
+                return Response(
+                    {"error": "Upload has expired"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get file path
+            file_full_path = os.path.join(settings.MEDIA_ROOT, temp_upload.file_path)
+            
+            if not os.path.exists(file_full_path):
+                return Response(
+                    {"error": "File not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Get selected columns from request, if provided
+            selected_columns = request.data.get('selected_columns', [])
+            
+            # Read headers from file
+            try:
+                if temp_upload.file_type == '.csv':
+                    df = pd.read_csv(file_full_path, nrows=0)  # Only read headers
+                    headers = df.columns.tolist()
+                elif temp_upload.file_type in ['.xlsx', '.xls']:
+                    df = pd.read_excel(file_full_path, nrows=0)  # Only read headers
+                    headers = df.columns.tolist()
+                else:
+                    return Response(
+                        {"error": f"Unsupported file type: {temp_upload.file_type}"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            except Exception as e:
+                return Response(
+                    {"error": f"Failed to read file headers: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # Use selected columns if provided, otherwise use all headers
+            headers_to_validate = selected_columns if selected_columns else headers
+            
+            # Validate headers using HeaderValidator
+            validator = HeaderValidator()
+            validation_results = validator.validate_headers(headers_to_validate)
+            
+            # Extract status report for easier frontend consumption
+            status_report = validation_results.get('status_report', {})
+            
+            # Determine overall validation status
+            validation_status = 'green' if status_report.get('validation_success') else 'red'
+            if status_report.get('validation_success') and len(status_report.get('optional_columns', {}).get('missing', [])) > 0:
+                validation_status = 'amber'  # All required found, but some optional missing
+            
+            # Prepare response data
+            response_data = {
+                "success": True,
+                "validation_status": validation_status,
+                "validation_results": validation_results,
+                "headers": headers,
+                "headers_validated": headers_to_validate,
+                "selected_columns": selected_columns,
+                "recommendations": status_report.get('recommendations', []),
+                "can_proceed_to_analysis": status_report.get('can_proceed_to_analysis', False)
+            }
+            
+            # Use serializer to handle ValidationResult objects
+            from .serializers import TemporaryFileHeaderValidationSerializer
+            serializer = TemporaryFileHeaderValidationSerializer(response_data)
+            
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except TemporaryUpload.DoesNotExist:
+            return Response(
+                {"error": "Upload not found or already processed"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Header validation failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 class ConfirmUploadView(APIView):
     """Column selection + dataset creation + start import (consolidated workflow)"""
     permission_classes = [IsAuthenticated]
@@ -814,34 +916,73 @@ class HeaderValidationView(APIView):
             
             # Check if already validated and not forcing revalidation
             if analysis_metadata.is_analysis_ready and not force_revalidate:
-                return Response({
+                # Get existing validation results in proper format
+                existing_results = self._get_existing_validation_results(analysis_metadata)
+                existing_summary = self._get_validation_summary(analysis_metadata)
+                
+                # Determine validation status
+                validation_status = 'green' if existing_summary.get('can_generate_insights') else 'red'
+                if existing_summary.get('can_generate_insights') and existing_summary.get('missing_count', 0) > 0:
+                    validation_status = 'amber'
+                
+                response_data = {
                     "success": True,
-                    "message": "Headers already validated",
-                    "validation_results": self._get_existing_validation_results(analysis_metadata),
-                    "validation_summary": self._get_validation_summary(analysis_metadata)
-                }, status=status.HTTP_200_OK)
+                    "validation_status": validation_status,
+                    "validation_results": existing_results,
+                    "headers": list(analysis_metadata.dataset.selected_columns),
+                    "recommendations": [],
+                    "can_proceed_to_analysis": existing_summary.get('can_generate_insights', False)
+                }
+                
+                # Use the same serializer
+                from .serializers import TemporaryFileHeaderValidationSerializer
+                serializer = TemporaryFileHeaderValidationSerializer(response_data)
+                
+                return Response(serializer.data, status=status.HTTP_200_OK)
             
             # Perform header validation
             validator = HeaderValidator()
             headers = list(analysis_metadata.dataset.selected_columns)
             
             validation_results = validator.validate_headers(headers)
-            validation_summary = validator.get_validation_summary(validation_results)
+            
+            # Extract status report for easier frontend consumption
+            status_report = validation_results.get('status_report', {})
+            
+            # Determine overall validation status
+            validation_status = 'green' if status_report.get('validation_success') else 'red'
+            if status_report.get('validation_success') and len(status_report.get('optional_columns', {}).get('missing', [])) > 0:
+                validation_status = 'amber'  # All required found, but some optional missing
             
             # Clear existing validations if revalidating
             if force_revalidate:
                 analysis_metadata.header_validations.all().delete()
             
-            # Save validation results
-            for header_type, result in validation_results.items():
+            # Save validation results - process required and optional columns
+            required_results = validation_results.get('required_columns', {})
+            for header_type, result in required_results.items():
                 HeaderValidation.objects.update_or_create(
                     dataset_analysis=analysis_metadata,
                     header_type=header_type,
                     defaults={
-                        'matched_column': result['matched_column'],
-                        'confidence_score': result['confidence_score'],
-                        'is_found': result['is_found'],
-                        'validation_method': result['validation_method']
+                        'matched_column': result.matched_column,
+                        'confidence_score': result.confidence_score,
+                        'is_found': result.is_found,
+                        'validation_method': result.validation_method
+                    }
+                )
+            
+            # Process optional columns
+            optional_results = validation_results.get('optional_columns', {})
+            for header_type, result in optional_results.items():
+                HeaderValidation.objects.update_or_create(
+                    dataset_analysis=analysis_metadata,
+                    header_type=header_type,
+                    defaults={
+                        'matched_column': result.matched_column,
+                        'confidence_score': result.confidence_score,
+                        'is_found': result.is_found,
+                        'validation_method': result.validation_method
                     }
                 )
             
@@ -850,12 +991,21 @@ class HeaderValidationView(APIView):
             analysis_metadata.analysis_validated_at = timezone.now()
             analysis_metadata.save()
             
-            return Response({
+            # Prepare response data using same format as temporary file validation
+            response_data = {
                 "success": True,
-                "message": "Header validation completed",
+                "validation_status": validation_status,
                 "validation_results": validation_results,
-                "validation_summary": validation_summary
-            }, status=status.HTTP_200_OK)
+                "headers": headers,
+                "recommendations": status_report.get('recommendations', []),
+                "can_proceed_to_analysis": status_report.get('can_proceed_to_analysis', False)
+            }
+            
+            # Use the same serializer as temporary file validation
+            from .serializers import TemporaryFileHeaderValidationSerializer
+            serializer = TemporaryFileHeaderValidationSerializer(response_data)
+            
+            return Response(serializer.data, status=status.HTTP_200_OK)
             
         except DatasetAnalysisMetadata.DoesNotExist:
             return Response(
@@ -869,19 +1019,36 @@ class HeaderValidationView(APIView):
             )
     
     def _get_existing_validation_results(self, analysis_metadata):
-        """Get existing validation results for a table"""
-        results = {}
+        """Get existing validation results for a table in the expected format"""
+        from .services.header_validator import HeaderValidatorConfig
+        
+        # Get column definitions to know which are required vs optional
+        config = HeaderValidatorConfig()
+        required_defs = config.get_required_definitions()
+        optional_defs = config.get_optional_definitions()
+        
         validations = analysis_metadata.header_validations.all()
         
+        required_columns = {}
+        optional_columns = {}
+        
         for validation in validations:
-            results[validation.header_type] = {
+            validation_data = {
                 'matched_column': validation.matched_column,
                 'confidence_score': validation.confidence_score,
                 'is_found': validation.is_found,
                 'validation_method': validation.validation_method
             }
+            
+            if validation.header_type in required_defs:
+                required_columns[validation.header_type] = validation_data
+            elif validation.header_type in optional_defs:
+                optional_columns[validation.header_type] = validation_data
         
-        return results
+        return {
+            'required_columns': required_columns,
+            'optional_columns': optional_columns
+        }
     
     def _get_validation_summary(self, analysis_metadata):
         """Get validation summary for a table"""

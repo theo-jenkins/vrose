@@ -234,3 +234,51 @@ class HeaderValidationResponseSerializer(serializers.Serializer):
     message = serializers.CharField()
     validation_results = serializers.DictField()
     validation_summary = serializers.DictField()
+
+# ValidationResult serializer for header validation
+class ValidationResultSerializer(serializers.Serializer):
+    matched_column = serializers.CharField(allow_null=True)
+    confidence_score = serializers.IntegerField()
+    is_found = serializers.BooleanField()
+    best_match_word = serializers.CharField(allow_null=True)
+    validation_method = serializers.CharField()
+
+class TemporaryFileHeaderValidationSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    validation_status = serializers.ChoiceField(choices=['green', 'amber', 'red'])
+    validation_results = serializers.DictField()
+    headers = serializers.ListField(child=serializers.CharField())
+    recommendations = serializers.ListField(child=serializers.CharField())
+    can_proceed_to_analysis = serializers.BooleanField()
+    
+    def to_representation(self, instance):
+        """Convert ValidationResult objects to serializable format"""
+        from .services.header_validator import ValidationResult
+        
+        def serialize_validation_results(results_dict):
+            serialized = {}
+            for key, validation_result in results_dict.items():
+                if isinstance(validation_result, ValidationResult):
+                    # Convert ValidationResult dataclass to dict using our serializer
+                    serializer = ValidationResultSerializer(validation_result)
+                    serialized[key] = serializer.data
+                else:
+                    serialized[key] = validation_result
+            return serialized
+        
+        # Get the original data
+        data = super().to_representation(instance)
+        
+        # Serialize the validation results if they contain ValidationResult objects
+        if 'validation_results' in data:
+            validation_results = data['validation_results']
+            if 'required_columns' in validation_results:
+                validation_results['required_columns'] = serialize_validation_results(
+                    validation_results['required_columns']
+                )
+            if 'optional_columns' in validation_results:
+                validation_results['optional_columns'] = serialize_validation_results(
+                    validation_results['optional_columns']
+                )
+        
+        return data
