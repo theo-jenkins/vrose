@@ -199,6 +199,12 @@ def _process_file_import(file_path: str, dataset: UserDataset, import_task: Impo
                         # Convert numpy types to Python types
                         if isinstance(value, (np.integer, np.floating)):
                             cleaned_row[original_col] = value.item()
+                        elif isinstance(value, pd.Timestamp):
+                            # Keep timestamps as timestamps for proper database insertion
+                            cleaned_row[original_col] = value.to_pydatetime() if pd.notna(value) else None
+                        elif hasattr(value, 'date') and callable(getattr(value, 'date')):
+                            # Handle datetime objects
+                            cleaned_row[original_col] = value
                         else:
                             cleaned_row[original_col] = str(value) if value is not None else None
                 

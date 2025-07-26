@@ -87,15 +87,6 @@ const TableCard: React.FC<TableCardProps> = ({
                 <span>{dataset.created_at ? formatDate(dataset.created_at) : 'Unknown date'}</span>
               </div>
             </div>
-
-            {/* Validation status */}
-            <div className="mt-3">
-              <HeaderValidation
-                datasetId={dataset.id}
-                autoValidate={false}
-                onValidationComplete={handleValidationUpdate}
-              />
-            </div>
           </div>
         </div>
 

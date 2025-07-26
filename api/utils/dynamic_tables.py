@@ -70,18 +70,48 @@ class DataTypeDetector:
     def _is_integer(series: pd.Series) -> bool:
         """Check if series can be converted to integer"""
         try:
+            # Remove null values for testing
+            non_null_series = series.dropna()
+            if len(non_null_series) == 0:
+                return False
+            
+            # Convert to string to check for date-like patterns that should NOT be integers
+            str_series = non_null_series.astype(str)
+            
+            # Exclude values that look like dates (common date patterns)
+            date_like_patterns = [
+                r'\d{1,2}/\d{1,2}/\d{4}',  # MM/DD/YYYY or DD/MM/YYYY
+                r'\d{4}-\d{1,2}-\d{1,2}',  # YYYY-MM-DD
+                r'\d{1,2}-\d{1,2}-\d{4}',  # MM-DD-YYYY or DD-MM-YYYY
+                r'\d{1,2}\.\d{1,2}\.\d{4}', # DD.MM.YYYY
+                r'\d{4}/\d{1,2}/\d{1,2}'   # YYYY/MM/DD
+            ]
+            
+            # If any values match date patterns, this is likely not an integer column
+            for pattern in date_like_patterns:
+                if str_series.str.match(pattern).any():
+                    logger.debug(f"Rejecting integer detection - found date-like pattern: {pattern}")
+                    return False
+            
             # Convert to numeric first, handling strings
-            numeric_series = pd.to_numeric(series, errors='coerce')
+            numeric_series = pd.to_numeric(non_null_series, errors='coerce')
             
             # Check if most values were successfully converted
-            if numeric_series.notna().sum() < len(series) * 0.8:  # 80% success rate
+            success_rate = numeric_series.notna().sum() / len(non_null_series)
+            if success_rate < 0.8:  # 80% success rate
                 return False
             
             # Check if all numeric values are integers (no decimal parts)
             valid_numeric = numeric_series.dropna()
-            return (valid_numeric == valid_numeric.astype(int)).all()
+            is_integer = (valid_numeric == valid_numeric.astype(int)).all()
             
-        except (ValueError, TypeError):
+            if is_integer:
+                logger.debug(f"Integer detection successful with {success_rate:.2%} success rate")
+            
+            return is_integer
+            
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Integer detection failed: {str(e)}")
             return False
     
     @staticmethod
@@ -126,20 +156,49 @@ class DataTypeDetector:
     def _is_date(series: pd.Series) -> bool:
         """Check if series can be converted to date"""
         try:
+            # Remove null values for testing
+            non_null_series = series.dropna()
+            if len(non_null_series) == 0:
+                return False
+            
+            # Convert to string first to handle mixed types
+            str_series = non_null_series.astype(str)
+            
+            # Check for obvious date patterns first
+            date_patterns = [
+                r'\d{1,2}/\d{1,2}/\d{4}',  # MM/DD/YYYY or DD/MM/YYYY
+                r'\d{4}-\d{1,2}-\d{1,2}',  # YYYY-MM-DD
+                r'\d{1,2}-\d{1,2}-\d{4}',  # MM-DD-YYYY or DD-MM-YYYY
+                r'\d{1,2}\.\d{1,2}\.\d{4}' # DD.MM.YYYY
+            ]
+            
+            # Check if any values match common date patterns
+            has_date_pattern = False
+            for pattern in date_patterns:
+                if str_series.str.match(pattern).any():
+                    has_date_pattern = True
+                    break
+            
+            if not has_date_pattern:
+                return False
+            
             # Try common date formats first to avoid warnings
             common_date_formats = [
-                '%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y', '%Y-%m-%d %H:%M:%S',
+                '%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d', '%Y-%m-%d %H:%M:%S',
                 '%m-%d-%Y', '%d-%m-%Y', '%Y/%m/%d', '%d.%m.%Y'
             ]
             
-            # Convert to string first to handle mixed types
-            str_series = series.astype(str)
+            # Test a sample of the data to avoid performance issues
+            test_series = str_series.head(min(100, len(str_series)))
             
             # Check if any common date patterns exist
             for fmt in common_date_formats:
                 try:
-                    pd.to_datetime(str_series, format=fmt, errors='raise')
-                    return True
+                    parsed_dates = pd.to_datetime(test_series, format=fmt, errors='coerce')
+                    success_rate = parsed_dates.notna().sum() / len(parsed_dates)
+                    if success_rate > 0.8:  # 80% success rate
+                        logger.debug(f"Date format {fmt} matched with {success_rate:.2%} success rate")
+                        return True
                 except (ValueError, TypeError):
                     continue
             
@@ -147,11 +206,16 @@ class DataTypeDetector:
             import warnings
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                result = pd.to_datetime(str_series, errors='coerce', infer_datetime_format=True)
-                # Check if most values were successfully parsed (not NaT)
-                return result.notna().sum() > len(result) * 0.8  # 80% success rate
+                result = pd.to_datetime(test_series, errors='coerce', infer_datetime_format=True)
+                success_rate = result.notna().sum() / len(result)
+                if success_rate > 0.8:  # 80% success rate
+                    logger.debug(f"Date inference matched with {success_rate:.2%} success rate")
+                    return True
             
-        except (ValueError, TypeError):
+            return False
+            
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Date detection failed: {str(e)}")
             return False
     
     @staticmethod
@@ -486,25 +550,35 @@ def analyze_file_for_import(file_path: str, selected_columns: List[str]) -> Dict
         Dict with analysis results
     """
     try:
-        # Read file
+        # Read file with minimal parsing to detect raw data types
         if file_path.endswith('.csv'):
+            # Read as strings first to analyze raw data
+            df_raw = pd.read_csv(file_path, dtype=str, na_filter=False)
+            # Then read normally for actual data processing
             df = pd.read_csv(file_path)
         else:
+            # Read as strings first to analyze raw data
+            df_raw = pd.read_excel(file_path, dtype=str, na_filter=False)
+            # Then read normally for actual data processing
             df = pd.read_excel(file_path)
         
         # Filter to selected columns
         available_columns = [col for col in selected_columns if col in df.columns]
         df_filtered = df[available_columns]
+        df_raw_filtered = df_raw[available_columns] if all(col in df_raw.columns for col in available_columns) else df_filtered
         
         # Create column mapping
         column_mapping = ColumnNameSanitizer.create_column_mapping(available_columns)
         
-        # Detect data types
+        # Detect data types using raw string data first
         column_types = {}
         for original_col in available_columns:
             sanitized_col = column_mapping[original_col]
-            detected_type = DataTypeDetector.detect_column_type(df_filtered[original_col], original_col)
+            # Use raw data for type detection to avoid pandas auto-conversion
+            raw_series = df_raw_filtered[original_col].replace('', pd.NA) if original_col in df_raw_filtered.columns else df_filtered[original_col]
+            detected_type = DataTypeDetector.detect_column_type(raw_series, original_col)
             column_types[sanitized_col] = detected_type
+            logger.info(f"Column '{original_col}' detected as type: {detected_type}")
         
         return {
             'success': True,

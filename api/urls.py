@@ -4,7 +4,7 @@ from .views import (
     UserDetailsView, DashboardFeaturesView, GoogleAuthView,
     TemporaryFileUploadView, TemporaryFileHeaderValidationView, ConfirmUploadView, DiscardUploadView, UserDatasetsView,
     ImportProgressView, AnalyseDataView, DatasetAnalysisDetailView, DatasetDeleteView, 
-    HeaderValidationView, GenerateInsightsView, DatasetPreviewView
+    HeaderValidationView, GenerateInsightsView, DatasetPreviewView, GenerateInsightsAnalysisView, GetInsightsStatusView
 )
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 
@@ -34,4 +34,8 @@ urlpatterns = [
     path('features/analyse-data/<uuid:dataset_id>/validate-headers/', HeaderValidationView.as_view(), name='header_validation'),
     path('features/analyse-data/<uuid:dataset_id>/generate-insights/', GenerateInsightsView.as_view(), name='generate_insights'),
     path('features/analyse-data/<uuid:dataset_id>/preview/', DatasetPreviewView.as_view(), name='dataset_preview'),
+    
+    # Insight engine endpoints
+    path('features/analyse-data/<uuid:dataset_id>/insights/generate/', GenerateInsightsAnalysisView.as_view(), name='generate_insights_analysis'),
+    path('features/analyse-data/<uuid:dataset_id>/insights/status/', GetInsightsStatusView.as_view(), name='get_insights_status'),
 ]

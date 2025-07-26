@@ -1192,3 +1192,78 @@ class DatasetPreviewView(APIView):
                 {"error": f"Failed to fetch preview data: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class GenerateInsightsAnalysisView(APIView):
+    """Generate insights for a dataset using the insight engine"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, dataset_id):
+        from .models import DatasetAnalysisMetadata
+        from .services.insight_engine import create_insight_engine
+        from .serializers import InsightEngineResultSerializer
+        
+        try:
+            analysis_metadata = DatasetAnalysisMetadata.objects.get(
+                id=dataset_id,
+                dataset__user=request.user
+            )
+            
+            # Check if headers are validated
+            if not analysis_metadata.is_analysis_ready:
+                return Response({
+                    "error": "Dataset headers must be validated before generating insights"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Create insight engine and analyze dataset
+            insight_engine = create_insight_engine()
+            result = insight_engine.analyze_dataset(
+                dataset_id=str(analysis_metadata.id),
+                table_name=analysis_metadata.dataset.table_name,
+                selected_columns=list(analysis_metadata.dataset.selected_columns)
+            )
+            
+            # Serialize the result
+            serializer = InsightEngineResultSerializer(result)
+            
+            return Response({
+                "success": True,
+                "insight_analysis": serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except DatasetAnalysisMetadata.DoesNotExist:
+            return Response(
+                {"error": "Dataset analysis metadata not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Insight generation failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class GetInsightsStatusView(APIView):
+    """Get status of insight generation for a dataset"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, dataset_id):
+        from .models import DatasetAnalysisMetadata
+        from .serializers import DatasetAnalysisMetadataSerializer
+        
+        try:
+            analysis_metadata = DatasetAnalysisMetadata.objects.get(
+                id=dataset_id,
+                dataset__user=request.user
+            )
+            
+            serializer = DatasetAnalysisMetadataSerializer(analysis_metadata)
+            
+            return Response({
+                "success": True,
+                "dataset": serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except DatasetAnalysisMetadata.DoesNotExist:
+            return Response(
+                {"error": "Dataset analysis metadata not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )

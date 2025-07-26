@@ -282,3 +282,15 @@ class TemporaryFileHeaderValidationSerializer(serializers.Serializer):
                 )
         
         return data
+
+class InsightEngineResultSerializer(serializers.Serializer):
+    """Serializer for insight engine analysis results"""
+    status = serializers.ChoiceField(choices=['pending', 'analyzing', 'completed', 'failed'])
+    dataset_info = serializers.DictField()
+    validation_summary = serializers.DictField()
+    matched_methods = serializers.ListField()
+    selected_method = serializers.DictField(allow_null=True)
+    analysis_results = serializers.DictField(allow_null=True)
+    error_message = serializers.CharField(allow_null=True)
+    created_at = serializers.DateTimeField()
+    completed_at = serializers.DateTimeField(allow_null=True)

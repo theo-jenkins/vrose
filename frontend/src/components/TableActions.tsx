@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useRouter } from 'next/router';
 import { DatasetAnalysisMetadata, analyseDataService } from '../services/analyseDataService';
 import { 
   TrashIcon, 
@@ -21,6 +22,7 @@ const TableActions: React.FC<TableActionsProps> = ({
   onDeleted,
   onGenerateInsights,
 }) => {
+  const router = useRouter();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -34,7 +36,7 @@ const TableActions: React.FC<TableActionsProps> = ({
     );
   }
 
-  const canGenerateInsights = validationData?.can_generate_insights || false;
+  const canGenerateInsights = validationData?.can_generate_insights || true;
 
   const handleDelete = async () => {
     try {
@@ -54,7 +56,8 @@ const TableActions: React.FC<TableActionsProps> = ({
 
   const handleGenerateInsights = () => {
     if (canGenerateInsights) {
-      onGenerateInsights(dataset.id);
+      // Navigate to the insights generation page
+      router.push(`/features/analyse-data/${dataset.id}/generate-insights`);
     }
   };
 
