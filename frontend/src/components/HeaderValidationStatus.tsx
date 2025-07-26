@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TableAnalysisMetadata, analyseDataService } from '../services/analyseDataService';
+import { DatasetAnalysisMetadata, analyseDataService } from '../services/analyseDataService';
 import { 
   CheckCircleIcon, 
   ExclamationTriangleIcon, 
@@ -8,7 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 interface HeaderValidationStatusProps {
-  table: TableAnalysisMetadata;
+  dataset: DatasetAnalysisMetadata;
   validationData: any;
   isValidating: boolean;
   onValidationUpdate: (newValidationData: any) => void;
@@ -16,7 +16,7 @@ interface HeaderValidationStatusProps {
 }
 
 const HeaderValidationStatus: React.FC<HeaderValidationStatusProps> = ({
-  table,
+  dataset,
   validationData,
   isValidating,
   onValidationUpdate,
@@ -24,12 +24,21 @@ const HeaderValidationStatus: React.FC<HeaderValidationStatusProps> = ({
 }) => {
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  // Defensive check for dataset
+  if (!dataset) {
+    return (
+      <div className="text-light-text dark:text-dark-text opacity-80 text-sm">
+        Dataset information not available
+      </div>
+    );
+  }
+
   const handleValidateHeaders = async (forceRevalidate: boolean = false) => {
     try {
       onValidatingChange(true);
       setValidationError(null);
       
-      const response = await analyseDataService.validateHeaders(table.id, {
+      const response = await analyseDataService.validateHeaders(dataset.id, {
         force_revalidate: forceRevalidate,
       });
       
@@ -66,7 +75,7 @@ const HeaderValidationStatus: React.FC<HeaderValidationStatusProps> = ({
       );
     }
 
-    if (!table.is_validated) {
+    if (!dataset.is_analysis_ready) {
       return (
         <div className="space-y-3">
           <div className="flex items-center text-light-text dark:text-dark-text opacity-80">
@@ -74,13 +83,6 @@ const HeaderValidationStatus: React.FC<HeaderValidationStatusProps> = ({
             <span className="text-sm">Headers not validated yet</span>
           </div>
           
-          <button
-            onClick={() => handleValidateHeaders()}
-            className="inline-flex items-center px-3 py-1 border border-light-text/20 dark:border-dark-text/20 text-sm font-medium rounded-lg text-light-text dark:text-dark-text bg-light-form-field dark:bg-dark-form-field hover:bg-light-background dark:hover:bg-dark-background transition-all duration-300"
-          >
-            <ArrowPathIcon className="h-4 w-4 mr-1" />
-            Validate Headers
-          </button>
         </div>
       );
     }
@@ -97,13 +99,6 @@ const HeaderValidationStatus: React.FC<HeaderValidationStatusProps> = ({
             Found all required headers: Date/Time, Product ID, Quantity, Revenue
           </div>
           
-          <button
-            onClick={() => handleValidateHeaders(true)}
-            className="inline-flex items-center px-3 py-1 border border-light-text/20 dark:border-dark-text/20 text-sm font-medium rounded-lg text-light-text dark:text-dark-text bg-light-form-field dark:bg-dark-form-field hover:bg-light-background dark:hover:bg-dark-background transition-all duration-300"
-          >
-            <ArrowPathIcon className="h-4 w-4 mr-1" />
-            Re-validate
-          </button>
         </div>
       );
     }
@@ -131,13 +126,6 @@ const HeaderValidationStatus: React.FC<HeaderValidationStatusProps> = ({
           Cannot generate insights until all headers are found
         </div>
         
-        <button
-          onClick={() => handleValidateHeaders(true)}
-          className="inline-flex items-center px-3 py-1 border border-light-text/20 dark:border-dark-text/20 text-sm font-medium rounded-lg text-light-text dark:text-dark-text bg-light-form-field dark:bg-dark-form-field hover:bg-light-background dark:hover:bg-dark-background transition-all duration-300"
-        >
-          <ArrowPathIcon className="h-4 w-4 mr-1" />
-          Re-validate
-        </button>
       </div>
     );
   };

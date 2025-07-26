@@ -2,6 +2,7 @@ import os
 import uuid
 import pandas as pd
 import magic
+import numpy as np
 from datetime import datetime, timedelta
 from django.conf import settings
 from django.core.files.storage import default_storage
@@ -57,6 +58,30 @@ def generate_unique_filename(original_filename):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return f"{name}_{timestamp}_{unique_id}{ext}"
 
+def convert_timestamps_to_strings(data):
+    """Convert pandas Timestamp objects to strings for JSON serialization"""
+    if isinstance(data, dict):
+        return {key: convert_timestamps_to_strings(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [convert_timestamps_to_strings(item) for item in data]
+    elif isinstance(data, pd.Timestamp):
+        # Convert pandas Timestamp to string
+        return data.strftime('%Y-%m-%d %H:%M:%S') if pd.notna(data) else None
+    elif data is pd.NaT:
+        # Handle pandas NaT (Not a Time) values
+        return None
+    elif pd.isna(data):
+        # Handle other pandas NA values
+        return None
+    elif isinstance(data, (np.integer, np.floating)):
+        # Handle numpy numbers
+        return data.item()
+    elif hasattr(data, 'date') and callable(getattr(data, 'date')):
+        # Handle datetime.date objects
+        return data.strftime('%Y-%m-%d %H:%M:%S') if hasattr(data, 'strftime') else str(data)
+    else:
+        return data
+
 def save_temporary_file(file_obj, user_id):
     """Save uploaded file to temporary storage"""
     # Create temp directory structure
@@ -86,9 +111,14 @@ def generate_file_preview(file_path, file_type):
             raise FileValidationError(f"Unsupported file type for preview: {file_type}")
         
         # Convert to dict for JSON serialization
+        rows_data = df.to_dict('records')
+        
+        # Convert any pandas Timestamp objects to strings for JSON serialization
+        rows_data = convert_timestamps_to_strings(rows_data)
+        
         preview_data = {
             'columns': df.columns.tolist(),
-            'rows': df.to_dict('records'),
+            'rows': rows_data,
             'total_rows_sample': len(df),
             'total_columns': len(df.columns)
         }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { TableAnalysisMetadata, analyseDataService } from '../services/analyseDataService';
+import { useRouter } from 'next/router';
+import { DatasetAnalysisMetadata, analyseDataService } from '../services/analyseDataService';
 import { 
   TrashIcon, 
   ChartBarIcon, 
@@ -7,36 +8,46 @@ import {
 } from '@heroicons/react/24/outline';
 
 interface TableActionsProps {
-  table: TableAnalysisMetadata;
+  dataset: DatasetAnalysisMetadata;
   validationData: any;
   isValidating: boolean;
-  onDeleted: (tableId: string) => void;
-  onGenerateInsights: (tableId: string) => void;
+  onDeleted: (datasetId: string) => void;
+  onGenerateInsights: (datasetId: string) => void;
 }
 
 const TableActions: React.FC<TableActionsProps> = ({
-  table,
+  dataset,
   validationData,
   isValidating,
   onDeleted,
   onGenerateInsights,
 }) => {
+  const router = useRouter();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const canGenerateInsights = validationData?.can_generate_insights || false;
+  // Defensive check for dataset
+  if (!dataset) {
+    return (
+      <div className="text-light-text dark:text-dark-text opacity-80 text-sm">
+        Actions not available
+      </div>
+    );
+  }
+
+  const canGenerateInsights = validationData?.can_generate_insights || true;
 
   const handleDelete = async () => {
     try {
       setIsDeleting(true);
       setDeleteError(null);
       
-      await analyseDataService.deleteSavedTable(table.id);
-      onDeleted(table.id);
+      await analyseDataService.deleteDataset(dataset.dataset_id);
+      onDeleted(dataset.id);
     } catch (error) {
-      console.error('Error deleting table:', error);
-      setDeleteError('Failed to delete table. Please try again.');
+      console.error('Error deleting dataset:', error);
+      setDeleteError('Failed to delete dataset. Please try again.');
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
@@ -45,7 +56,8 @@ const TableActions: React.FC<TableActionsProps> = ({
 
   const handleGenerateInsights = () => {
     if (canGenerateInsights) {
-      onGenerateInsights(table.id);
+      // Navigate to the insights generation page
+      router.push(`/features/analyse-data/${dataset.id}/generate-insights`);
     }
   };
 
@@ -66,10 +78,10 @@ const TableActions: React.FC<TableActionsProps> = ({
             <ExclamationTriangleIcon className="h-5 w-5 text-light-text dark:text-dark-text mr-2 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm text-light-text dark:text-dark-text font-medium">
-                Are you sure you want to delete this table?
+                Are you sure you want to delete this dataset?
               </p>
               <p className="text-sm text-light-text dark:text-dark-text opacity-80 mt-1">
-                This action cannot be undone. The table "{table.display_name}" will be permanently removed.
+                This action cannot be undone. The dataset "{dataset.dataset_name || 'Unknown'}" will be permanently removed.
               </p>
             </div>
           </div>
@@ -120,7 +132,7 @@ const TableActions: React.FC<TableActionsProps> = ({
         title={
           !canGenerateInsights 
             ? 'All required headers must be validated before generating insights'
-            : 'Generate insights for this table'
+            : 'Generate insights for this dataset'
         }
       >
         <ChartBarIcon className="h-4 w-4 mr-2" />
@@ -132,7 +144,7 @@ const TableActions: React.FC<TableActionsProps> = ({
         onClick={() => setShowDeleteConfirm(true)}
         disabled={isDeleting || isValidating}
         className="px-4 py-2 border border-light-text/20 dark:border-dark-text/20 text-sm font-medium rounded-lg text-light-text dark:text-dark-text bg-light-form-field dark:bg-dark-form-field hover:bg-light-error/10 dark:hover:bg-dark-error/10 hover:text-light-error dark:hover:text-dark-error hover:border-light-error/40 dark:hover:border-dark-error/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
-        title="Delete this table"
+        title="Delete this dataset"
       >
         <TrashIcon className="h-4 w-4" />
       </button>

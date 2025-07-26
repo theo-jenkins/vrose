@@ -16,7 +16,7 @@ from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from .serializers import SignUpSerializer, CustomTokenObtainPairSerializer
-from .models import CustomUser, DashboardFeature, ImportedDataAnalysisMetadata
+from .models import CustomUser, DashboardFeature, DatasetAnalysisMetadata
 
 
 # API endpoint for fetching CSRF token
@@ -369,14 +369,119 @@ class TemporaryFileUploadView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-class ConfirmUploadView(APIView):
-    """Confirm temporary upload and move to processing queue"""
+class TemporaryFileHeaderValidationView(APIView):
+    """Validate headers for a temporary uploaded file"""
     permission_classes = [IsAuthenticated]
     
     def post(self, request, temp_id):
-        from .models import TemporaryUpload, ProcessedUpload
-        from .serializers import ProcessedUploadSerializer
+        from .models import TemporaryUpload
+        from .services.header_validator import HeaderValidator
+        from django.conf import settings
+        import os
+        import pandas as pd
+        
+        try:
+            # Get temporary upload
+            temp_upload = TemporaryUpload.objects.get(
+                id=temp_id,
+                user=request.user,
+                status__in=['uploaded', 'validated']
+            )
+            
+            # Check if not expired
+            from django.utils import timezone
+            if temp_upload.expires_at < timezone.now():
+                return Response(
+                    {"error": "Upload has expired"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get file path
+            file_full_path = os.path.join(settings.MEDIA_ROOT, temp_upload.file_path)
+            
+            if not os.path.exists(file_full_path):
+                return Response(
+                    {"error": "File not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Get selected columns from request, if provided
+            selected_columns = request.data.get('selected_columns', [])
+            
+            # Read headers from file
+            try:
+                if temp_upload.file_type == '.csv':
+                    df = pd.read_csv(file_full_path, nrows=0)  # Only read headers
+                    headers = df.columns.tolist()
+                elif temp_upload.file_type in ['.xlsx', '.xls']:
+                    df = pd.read_excel(file_full_path, nrows=0)  # Only read headers
+                    headers = df.columns.tolist()
+                else:
+                    return Response(
+                        {"error": f"Unsupported file type: {temp_upload.file_type}"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            except Exception as e:
+                return Response(
+                    {"error": f"Failed to read file headers: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # Use selected columns if provided, otherwise use all headers
+            headers_to_validate = selected_columns if selected_columns else headers
+            
+            # Validate headers using HeaderValidator
+            validator = HeaderValidator()
+            validation_results = validator.validate_headers(headers_to_validate)
+            
+            # Extract status report for easier frontend consumption
+            status_report = validation_results.get('status_report', {})
+            
+            # Determine overall validation status
+            validation_status = 'green' if status_report.get('validation_success') else 'red'
+            if status_report.get('validation_success') and len(status_report.get('optional_columns', {}).get('missing', [])) > 0:
+                validation_status = 'amber'  # All required found, but some optional missing
+            
+            # Prepare response data
+            response_data = {
+                "success": True,
+                "validation_status": validation_status,
+                "validation_results": validation_results,
+                "headers": headers,
+                "headers_validated": headers_to_validate,
+                "selected_columns": selected_columns,
+                "recommendations": status_report.get('recommendations', []),
+                "can_proceed_to_analysis": status_report.get('can_proceed_to_analysis', False)
+            }
+            
+            # Use serializer to handle ValidationResult objects
+            from .serializers import TemporaryFileHeaderValidationSerializer
+            serializer = TemporaryFileHeaderValidationSerializer(response_data)
+            
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except TemporaryUpload.DoesNotExist:
+            return Response(
+                {"error": "Upload not found or already processed"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Header validation failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class ConfirmUploadView(APIView):
+    """Column selection + dataset creation + start import (consolidated workflow)"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, temp_id):
+        from .models import TemporaryUpload, UserDataset
+        from .serializers import UserDatasetSerializer
+        from .utils.dynamic_tables import analyze_file_for_import, DynamicTableManager
         from django.utils import timezone
+        from django.conf import settings
+        import os
         
         try:
             # Get temporary upload
@@ -393,33 +498,99 @@ class ConfirmUploadView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
+            # Extract and validate request data
+            dataset_name = request.data.get('name', temp_upload.original_filename)
+            selected_columns = request.data.get('selected_columns', [])
+            
+            if not selected_columns:
+                return Response(
+                    {"error": "Selected columns are required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate selected columns exist in preview data
+            if temp_upload.preview_data and temp_upload.preview_data.get('columns'):
+                available_columns = temp_upload.preview_data['columns']
+                invalid_columns = [col for col in selected_columns if col not in available_columns]
+                if invalid_columns:
+                    return Response(
+                        {"error": f"Invalid columns selected: {invalid_columns}"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Analyze file for import
+            file_full_path = os.path.join(settings.MEDIA_ROOT, temp_upload.file_path)
+            analysis = analyze_file_for_import(file_full_path, selected_columns)
+            
+            if not analysis['success']:
+                return Response(
+                    {"error": f"File analysis failed: {analysis['error']}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
             # Update temporary upload status
             temp_upload.status = 'confirmed'
             temp_upload.confirmed_at = timezone.now()
             temp_upload.save()
             
-            # Create processed upload record
-            processed_upload = ProcessedUpload.objects.create(
+            # Create UserDataset record
+            dataset = UserDataset.objects.create(
                 user=request.user,
                 temporary_upload=temp_upload,
+                name=dataset_name,
                 original_filename=temp_upload.original_filename,
-                processed_file_path=temp_upload.file_path,  # Will be updated after processing
+                table_name='',  # Will be generated
+                selected_columns=selected_columns,
+                column_mapping=analysis['column_mapping'],
+                column_types=analysis['column_types'],
+                total_rows=analysis['total_rows'],
                 file_size=temp_upload.file_size,
                 file_type=temp_upload.file_type,
-                processing_status='pending'
+                status='importing'
             )
             
-            # TODO: Queue Celery task for background processing
-            # processed_upload.celery_task_id = process_file_task.delay(processed_upload.id).id
-            # processed_upload.save()
+            # Generate and set unique table name
+            dataset.table_name = dataset.generate_table_name()
             
-            serializer = ProcessedUploadSerializer(processed_upload)
+            # Ensure table name is unique
+            counter = 1
+            original_table_name = dataset.table_name
+            while UserDataset.objects.filter(table_name=dataset.table_name).exclude(id=dataset.id).exists():
+                dataset.table_name = f"{original_table_name}_{counter}"
+                counter += 1
+            
+            dataset.save()
+            
+            # Create the database table
+            table_created = DynamicTableManager.create_table(
+                dataset.table_name,
+                analysis['column_types']
+            )
+            
+            if not table_created:
+                dataset.status = 'failed'
+                dataset.error_details = {'error': 'Failed to create database table'}
+                dataset.save()
+                
+                return Response(
+                    {"error": "Failed to create database table"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # Queue Celery task for data import
+            from .tasks import import_data_task
+            task_result = import_data_task.delay(str(dataset.id))
+            dataset.celery_task_id = str(task_result.id)
+            dataset.save()
+            
+            serializer = UserDatasetSerializer(dataset)
             
             return Response({
                 "success": True,
-                "upload": serializer.data,
-                "message": "Upload confirmed and queued for processing"
-            }, status=status.HTTP_200_OK)
+                "dataset": serializer.data,
+                "task_id": task_result.id,
+                "message": "Dataset created and import started"
+            }, status=status.HTTP_201_CREATED)
             
         except TemporaryUpload.DoesNotExist:
             return Response(
@@ -428,7 +599,7 @@ class ConfirmUploadView(APIView):
             )
         except Exception as e:
             return Response(
-                {"error": f"Confirmation failed: {str(e)}"},
+                {"error": f"Dataset creation failed: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -472,205 +643,100 @@ class DiscardUploadView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-class UserUploadsView(APIView):
-    """Get user's upload history and status"""
+class UserDatasetsView(APIView):
+    """List all user's datasets (replaces UserUploadsView)"""
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        from .models import ProcessedUpload
-        from .serializers import ProcessedUploadSerializer
+        from .models import UserDataset
+        from .serializers import UserDatasetSerializer
         
-        # Get user's processed uploads
-        uploads = ProcessedUpload.objects.filter(
-            user=request.user
-        ).order_by('-created_at')
+        # Get user's datasets with optional status filtering
+        status_filter = request.GET.get('status')
+        datasets = UserDataset.objects.filter(user=request.user)
         
-        serializer = ProcessedUploadSerializer(uploads, many=True)
+        if status_filter:
+            datasets = datasets.filter(status=status_filter)
+        
+        datasets = datasets.order_by('-created_at')
+        serializer = UserDatasetSerializer(datasets, many=True)
         
         return Response({
-            "uploads": serializer.data
+            "success": True,
+            "datasets": serializer.data,
+            "total_count": datasets.count()
         }, status=status.HTTP_200_OK)
 
-class ColumnSelectionView(APIView):
-    """Handle column selection and start data import process"""
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request, temp_id):
-        from .models import TemporaryUpload, ProcessedUpload, ImportedDataMetadata
-        from .serializers import ColumnSelectionRequestSerializer, ColumnSelectionResponseSerializer
-        from .utils.dynamic_tables import analyze_file_for_import, DynamicTableManager
-        from django.utils import timezone
-        from django.conf import settings
-        import os
-        
-        # Validate request data
-        request_serializer = ColumnSelectionRequestSerializer(data=request.data)
-        if not request_serializer.is_valid():
-            return Response(request_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            # Get temporary upload
-            temp_upload = TemporaryUpload.objects.get(
-                id=temp_id,
-                user=request.user,
-                status__in=['uploaded', 'validated']
-            )
-            
-            # Check if not expired
-            if temp_upload.expires_at < timezone.now():
-                return Response(
-                    {"error": "Upload has expired"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            selected_columns = request_serializer.validated_data['selected_columns']
-            
-            # Validate selected columns exist in preview data
-            if temp_upload.preview_data and temp_upload.preview_data.get('columns'):
-                available_columns = temp_upload.preview_data['columns']
-                invalid_columns = [col for col in selected_columns if col not in available_columns]
-                if invalid_columns:
-                    return Response(
-                        {"error": f"Invalid columns selected: {invalid_columns}"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-            
-            # Analyze file for import
-            file_full_path = os.path.join(settings.MEDIA_ROOT, temp_upload.file_path)
-            analysis = analyze_file_for_import(file_full_path, selected_columns)
-            
-            if not analysis['success']:
-                return Response(
-                    {"error": f"File analysis failed: {analysis['error']}"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-            
-            # Update temporary upload status
-            temp_upload.status = 'confirmed'
-            temp_upload.confirmed_at = timezone.now()
-            temp_upload.save()
-            
-            # Create or get processed upload record
-            processed_upload, created = ProcessedUpload.objects.get_or_create(
-                temporary_upload=temp_upload,
-                defaults={
-                    'user': request.user,
-                    'original_filename': temp_upload.original_filename,
-                    'processed_file_path': temp_upload.file_path,
-                    'file_size': temp_upload.file_size,
-                    'file_type': temp_upload.file_type,
-                    'processing_status': 'pending',
-                    'row_count': analysis['total_rows'],
-                    'column_count': len(selected_columns)
-                }
-            )
-            
-            # Create ImportedDataMetadata record
-            data_table = ImportedDataMetadata.objects.create(
-                user=request.user,
-                processed_upload=processed_upload,
-                table_name='',  # Will be set after generation
-                display_name=temp_upload.original_filename,
-                selected_columns=selected_columns,
-                column_mapping=analysis['column_mapping'],
-                column_types=analysis['column_types'],
-                total_rows=analysis['total_rows'],
-                import_status='pending'
-            )
-            
-            # Generate unique table name
-            table_name = data_table.generate_table_name()
-            
-            # Ensure table name is unique
-            counter = 1
-            original_table_name = table_name
-            while ImportedDataMetadata.objects.filter(table_name=table_name).exists():
-                table_name = f"{original_table_name}_{counter}"
-                counter += 1
-            
-            data_table.table_name = table_name
-            data_table.save()
-            
-            # Create the database table
-            table_created = DynamicTableManager.create_table(
-                table_name,
-                analysis['column_types']
-            )
-            
-            if not table_created:
-                data_table.import_status = 'failed'
-                data_table.error_message = 'Failed to create database table'
-                data_table.save()
-                
-                return Response(
-                    {"error": "Failed to create database table"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-            
-            # Queue Celery task for data import
-            from .tasks import import_data_task
-            
-            # Start the import task
-            task_result = import_data_task.delay(str(data_table.id))
-            data_table.celery_task_id = task_result.id
-            data_table.save()
-            
-            processed_upload.processing_status = 'processing'
-            processed_upload.celery_task_id = task_result.id
-            processed_upload.save()
-            
-            response_data = {
-                "success": True,
-                "task_id": data_table.id,
-                "table_name": table_name,
-                "total_rows": analysis['total_rows'],
-                "selected_columns": len(selected_columns),
-                "message": "Import started successfully"
-            }
-            
-            response_serializer = ColumnSelectionResponseSerializer(response_data)
-            return Response(response_serializer.data, status=status.HTTP_200_OK)
-            
-        except TemporaryUpload.DoesNotExist:
-            return Response(
-                {"error": "Upload not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        except Exception as e:
-            return Response(
-                {"error": f"Import failed: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
 class ImportProgressView(APIView):
-    """Get progress information for data import"""
+    """Track import progress by Celery task ID (updated for UserDataset)"""
     permission_classes = [IsAuthenticated]
     
     def get(self, request, task_id):
-        from .models import ImportedDataMetadata
-        from .serializers import ImportProgressSerializer
+        from .models import UserDataset, ImportTask
+        from celery.result import AsyncResult
         
         try:
-            data_table = ImportedDataMetadata.objects.get(
-                id=task_id,
-                user=request.user
-            )
+            # Try to find by dataset ID first, then by task ID
+            dataset = None
+            try:
+                dataset = UserDataset.objects.get(
+                    id=task_id,
+                    user=request.user
+                )
+                celery_task_id = dataset.celery_task_id
+            except UserDataset.DoesNotExist:
+                # Try to find by celery task ID
+                dataset = UserDataset.objects.get(
+                    celery_task_id=task_id,
+                    user=request.user
+                )
+                celery_task_id = task_id
             
-            progress_data = {
-                "task_id": data_table.id,
-                "status": data_table.import_status,
-                "current": data_table.processed_rows,
-                "total": data_table.total_rows,
-                "percentage": data_table.progress_percentage,
-                "message": self._get_progress_message(data_table),
-                "table_name": data_table.table_name,
-                "error_message": data_table.error_message
-            }
+            # Get Celery task status if available
+            task_result = AsyncResult(str(celery_task_id)) if celery_task_id else None
+            celery_status = task_result.status if task_result else None
             
-            serializer = ImportProgressSerializer(progress_data)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            # Get ImportTask for detailed progress if available
+            import_task = None
+            try:
+                import_task = ImportTask.objects.filter(
+                    dataset=dataset,
+                    status__in=['running', 'completed', 'failed']
+                ).first()
+            except ImportTask.DoesNotExist:
+                pass
             
-        except ImportedDataMetadata.DoesNotExist:
+            # Determine current progress
+            if import_task:
+                current = import_task.current_step
+                total = import_task.total_steps
+                percentage = import_task.progress_percentage
+                message = import_task.progress_message or self._get_progress_message(dataset)
+            else:
+                current = dataset.total_rows if dataset.status == 'active' else 0
+                total = dataset.total_rows or 0
+                percentage = 100 if dataset.status == 'active' else 0
+                message = self._get_progress_message(dataset)
+            
+            # Map backend status to frontend status
+            frontend_status = self._get_frontend_status(dataset.status, celery_status)
+            
+            return Response({
+                "success": True,
+                "task_id": str(task_id),
+                "dataset_id": str(dataset.id),
+                "status": frontend_status,
+                "celery_status": celery_status,
+                "current": current,
+                "total": total,
+                "percentage": percentage,
+                "message": message,
+                "table_name": dataset.table_name,
+                "dataset_name": dataset.name,
+                "error_details": dataset.error_details
+            }, status=status.HTTP_200_OK)
+            
+        except UserDataset.DoesNotExist:
             return Response(
                 {"error": "Import task not found"},
                 status=status.HTTP_404_NOT_FOUND
@@ -681,167 +747,165 @@ class ImportProgressView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    def _get_progress_message(self, data_table):
+    def _get_progress_message(self, dataset):
         """Generate human-readable progress message"""
-        if data_table.import_status == 'pending':
-            return "Import queued, waiting to start..."
-        elif data_table.import_status == 'processing':
-            if data_table.total_rows:
-                return f"Importing row {data_table.processed_rows} of {data_table.total_rows}"
-            else:
-                return "Processing data..."
-        elif data_table.import_status == 'completed':
-            return f"Import completed! {data_table.processed_rows} rows imported."
-        elif data_table.import_status == 'failed':
-            return f"Import failed: {data_table.error_message or 'Unknown error'}"
-        elif data_table.import_status == 'cancelled':
-            return "Import was cancelled"
+        if dataset.status == 'importing':
+            return "Import in progress..."
+        elif dataset.status == 'active':
+            return f"Import completed! Dataset '{dataset.name}' is ready."
+        elif dataset.status == 'failed':
+            error = dataset.error_details.get('error', 'Unknown error') if dataset.error_details else 'Unknown error'
+            return f"Import failed: {error}"
+        elif dataset.status == 'archived':
+            return "Dataset has been archived"
         else:
-            return "Unknown status"
-
-class ImportedDataMetadataView(APIView):
-    """Get user's imported data tables"""
-    permission_classes = [IsAuthenticated]
+            return f"Status: {dataset.status}"
     
-    def get(self, request):
-        from .models import ImportedDataMetadata
-        from .serializers import ImportedDataMetadataSerializer
-        
-        # Get user's data tables
-        data_tables = ImportedDataMetadata.objects.filter(
-            user=request.user
-        ).order_by('-created_at')
-        
-        serializer = ImportedDataMetadataSerializer(data_tables, many=True)
-        
-        return Response({
-            "data_tables": serializer.data
-        }, status=status.HTTP_200_OK)
+    def _get_frontend_status(self, dataset_status, celery_status):
+        """Map backend dataset status to frontend expected status"""
+        if dataset_status == 'importing':
+            return 'processing'
+        elif dataset_status == 'active':
+            return 'completed'
+        elif dataset_status == 'failed':
+            return 'failed'
+        elif celery_status == 'PENDING':
+            return 'pending'
+        elif celery_status in ['STARTED', 'PROGRESS']:
+            return 'processing'
+        else:
+            return dataset_status
 
-# Analyse Data Feature Views
+
+# Analyse Data Feature Views  
 class AnalyseDataView(APIView):
-    """List user's table analysis metadata for analysis"""
+    """List user's datasets available for analysis"""
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        from .models import ImportedDataAnalysisMetadata, ImportedDataMetadata
-        from .serializers import ImportedDataAnalysisMetadataListSerializer
+        from .models import DatasetAnalysisMetadata, UserDataset
+        from .serializers import DatasetAnalysisMetadataListSerializer
         
         logger.info(f"User {request.user.email} requesting analyse data tables")
         
-        # Get user's completed data tables
-        completed_data_tables = ImportedDataMetadata.objects.filter(
+        # Get user's active datasets
+        active_datasets = UserDataset.objects.filter(
             user=request.user,
-            import_status='completed'
-        ).select_related('processed_upload')
+            status='active'
+        )
         
-        logger.info(f"Found {completed_data_tables.count()} completed data tables for user {request.user.email}")
+        logger.info(f"Found {active_datasets.count()} active datasets for user {request.user.email}")
         
-        # Create ImportedDataAnalysisMetadata records for any that don't exist
+        # Create DatasetAnalysisMetadata records for any that don't exist
         created_count = 0
-        for data_table in completed_data_tables:
-            analysis_metadata, created = ImportedDataAnalysisMetadata.objects.get_or_create(
-                user_data_table=data_table,
-                defaults={
-                    'user': request.user,
-                    'display_name': data_table.display_name,
-                    'file_path': data_table.processed_upload.processed_file_path,
-                    'file_size': data_table.processed_upload.file_size,
-                    'row_count': data_table.total_rows or 0,
-                    'headers': data_table.selected_columns
-                }
+        for dataset in active_datasets:
+            analysis_metadata, created = DatasetAnalysisMetadata.objects.get_or_create(
+                dataset=dataset,
+                defaults={}
             )
             if created:
                 created_count += 1
-                logger.info(f"Created ImportedDataAnalysisMetadata for ImportedDataMetadata {data_table.id}")
+                logger.info(f"Created DatasetAnalysisMetadata for UserDataset {dataset.id}")
         
-        logger.info(f"Created {created_count} new ImportedDataAnalysisMetadata records")
+        logger.info(f"Created {created_count} new DatasetAnalysisMetadata records")
         
         # Get user's analysis metadata
-        analysis_metadata = ImportedDataAnalysisMetadata.objects.filter(
-            user=request.user
-        ).select_related('user_data_table').prefetch_related('header_validations')
+        analysis_metadata = DatasetAnalysisMetadata.objects.filter(
+            dataset__user=request.user
+        ).select_related('dataset').prefetch_related('header_validations')
         
         logger.info(f"Returning {analysis_metadata.count()} analysis metadata records")
         
-        serializer = ImportedDataAnalysisMetadataListSerializer(analysis_metadata, many=True)
+        serializer = DatasetAnalysisMetadataListSerializer(analysis_metadata, many=True)
         
         return Response({
             "saved_tables": serializer.data,
             "total_count": analysis_metadata.count()
         }, status=status.HTTP_200_OK)
 
-class ImportedDataAnalysisMetadataDetailView(APIView):
-    """Get detailed information about table analysis metadata"""
+class DatasetAnalysisDetailView(APIView):
+    """Get detailed information about dataset analysis metadata"""
     permission_classes = [IsAuthenticated]
     
-    def get(self, request, table_id):
-        from .models import ImportedDataAnalysisMetadata
-        from .serializers import ImportedDataAnalysisMetadataSerializer
+    def get(self, request, dataset_id):
+        from .models import DatasetAnalysisMetadata
+        from .serializers import DatasetAnalysisMetadataSerializer
         
         try:
-            analysis_metadata = ImportedDataAnalysisMetadata.objects.get(
-                id=table_id,
-                user=request.user
+            analysis_metadata = DatasetAnalysisMetadata.objects.get(
+                id=dataset_id,
+                dataset__user=request.user
             )
             
-            serializer = ImportedDataAnalysisMetadataSerializer(analysis_metadata)
+            serializer = DatasetAnalysisMetadataSerializer(analysis_metadata)
             
             return Response(serializer.data, status=status.HTTP_200_OK)
             
-        except ImportedDataAnalysisMetadata.DoesNotExist:
+        except DatasetAnalysisMetadata.DoesNotExist:
             return Response(
-                {"error": "Table analysis metadata not found"},
+                {"error": "Dataset analysis metadata not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
 
-class ImportedDataAnalysisMetadataDeleteView(APIView):
-    """Delete table analysis metadata and associated user data table"""
+class DatasetDeleteView(APIView):
+    """Delete dataset and associated analysis metadata"""
     permission_classes = [IsAuthenticated]
     
-    def delete(self, request, table_id):
-        from .models import ImportedDataAnalysisMetadata
+    def delete(self, request, dataset_id):
+        from .models import UserDataset
+        from .utils.dynamic_tables import DynamicTableManager
         from django.db import transaction
+        import logging
         
+        logger = logging.getLogger(__name__)
+
         try:
-            analysis_metadata = ImportedDataAnalysisMetadata.objects.get(
-                id=table_id,
+            dataset = UserDataset.objects.get(
+                id=dataset_id,
                 user=request.user
             )
             
-            table_name = analysis_metadata.display_name
-            user_data_table = analysis_metadata.user_data_table
+            dataset_name = dataset.name
+            table_name = dataset.table_name
             
-            # Delete both metadata and user data table in a transaction
+            # Delete both the dataset records and the dynamic table
             with transaction.atomic():
-                analysis_metadata.delete()
-                user_data_table.delete()
+                # First delete the dynamic table
+                if table_name:
+                    try:
+                        DynamicTableManager.drop_table(table_name)
+                        logger.info(f'Dropped dynamic table: {table_name}')
+                    except Exception as e:
+                        logger.warning(f'Failed to drop dynamic table: {table_name}: {str(e)}')
+                        # Continue with deletion even if table drop fails
+                # Delete dataset record (DatasetAnalysisMetadata will cascade delete)
+                dataset.delete()
             
             return Response({
-                "message": f"Table '{table_name}' and all associated data deleted successfully"
+                "message": f"Dataset '{dataset_name}' and all associated data deleted successfully"
             }, status=status.HTTP_200_OK)
             
-        except ImportedDataAnalysisMetadata.DoesNotExist:
+        except UserDataset.DoesNotExist:
             return Response(
-                {"error": "Table analysis metadata not found"},
+                {"error": "Dataset not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
 
 class HeaderValidationView(APIView):
-    """Validate headers for a saved table"""
+    """Validate headers for a dataset"""
     permission_classes = [IsAuthenticated]
     
-    def post(self, request, table_id):
-        from .models import ImportedDataAnalysisMetadata, HeaderValidation
+    def post(self, request, dataset_id):
+        from .models import DatasetAnalysisMetadata, HeaderValidation
         from .serializers import HeaderValidationRequestSerializer, HeaderValidationResponseSerializer
         from .services.header_validator import HeaderValidator
         from django.utils import timezone
         import pandas as pd
         
         try:
-            analysis_metadata = ImportedDataAnalysisMetadata.objects.get(
-                id=table_id,
-                user=request.user
+            analysis_metadata = DatasetAnalysisMetadata.objects.get(
+                id=dataset_id,
+                dataset__user=request.user
             )
             
             serializer = HeaderValidationRequestSerializer(data=request.data)
@@ -851,53 +915,101 @@ class HeaderValidationView(APIView):
             force_revalidate = serializer.validated_data.get('force_revalidate', False)
             
             # Check if already validated and not forcing revalidation
-            if analysis_metadata.is_validated and not force_revalidate:
-                return Response({
+            if analysis_metadata.is_analysis_ready and not force_revalidate:
+                # Get existing validation results in proper format
+                existing_results = self._get_existing_validation_results(analysis_metadata)
+                existing_summary = self._get_validation_summary(analysis_metadata)
+                
+                # Determine validation status
+                validation_status = 'green' if existing_summary.get('can_generate_insights') else 'red'
+                if existing_summary.get('can_generate_insights') and existing_summary.get('missing_count', 0) > 0:
+                    validation_status = 'amber'
+                
+                response_data = {
                     "success": True,
-                    "message": "Headers already validated",
-                    "validation_results": self._get_existing_validation_results(analysis_metadata),
-                    "validation_summary": self._get_validation_summary(analysis_metadata)
-                }, status=status.HTTP_200_OK)
+                    "validation_status": validation_status,
+                    "validation_results": existing_results,
+                    "headers": list(analysis_metadata.dataset.selected_columns),
+                    "recommendations": [],
+                    "can_proceed_to_analysis": existing_summary.get('can_generate_insights', False)
+                }
+                
+                # Use the same serializer
+                from .serializers import TemporaryFileHeaderValidationSerializer
+                serializer = TemporaryFileHeaderValidationSerializer(response_data)
+                
+                return Response(serializer.data, status=status.HTTP_200_OK)
             
             # Perform header validation
             validator = HeaderValidator()
-            headers = analysis_metadata.headers
+            headers = list(analysis_metadata.dataset.selected_columns)
             
             validation_results = validator.validate_headers(headers)
-            validation_summary = validator.get_validation_summary(validation_results)
+            
+            # Extract status report for easier frontend consumption
+            status_report = validation_results.get('status_report', {})
+            
+            # Determine overall validation status
+            validation_status = 'green' if status_report.get('validation_success') else 'red'
+            if status_report.get('validation_success') and len(status_report.get('optional_columns', {}).get('missing', [])) > 0:
+                validation_status = 'amber'  # All required found, but some optional missing
             
             # Clear existing validations if revalidating
             if force_revalidate:
                 analysis_metadata.header_validations.all().delete()
             
-            # Save validation results
-            for header_type, result in validation_results.items():
+            # Save validation results - process required and optional columns
+            required_results = validation_results.get('required_columns', {})
+            for header_type, result in required_results.items():
                 HeaderValidation.objects.update_or_create(
-                    table_analysis_metadata=analysis_metadata,
+                    dataset_analysis=analysis_metadata,
                     header_type=header_type,
                     defaults={
-                        'matched_column': result['matched_column'],
-                        'confidence_score': result['confidence_score'],
-                        'is_found': result['is_found'],
-                        'validation_method': result['validation_method']
+                        'matched_column': result.matched_column,
+                        'confidence_score': result.confidence_score,
+                        'is_found': result.is_found,
+                        'validation_method': result.validation_method
+                    }
+                )
+            
+            # Process optional columns
+            optional_results = validation_results.get('optional_columns', {})
+            for header_type, result in optional_results.items():
+                HeaderValidation.objects.update_or_create(
+                    dataset_analysis=analysis_metadata,
+                    header_type=header_type,
+                    defaults={
+                        'matched_column': result.matched_column,
+                        'confidence_score': result.confidence_score,
+                        'is_found': result.is_found,
+                        'validation_method': result.validation_method
                     }
                 )
             
             # Update analysis metadata validation status
-            analysis_metadata.is_validated = True
-            analysis_metadata.validation_completed_at = timezone.now()
+            analysis_metadata.is_analysis_ready = True
+            analysis_metadata.analysis_validated_at = timezone.now()
             analysis_metadata.save()
             
-            return Response({
+            # Prepare response data using same format as temporary file validation
+            response_data = {
                 "success": True,
-                "message": "Header validation completed",
+                "validation_status": validation_status,
                 "validation_results": validation_results,
-                "validation_summary": validation_summary
-            }, status=status.HTTP_200_OK)
+                "headers": headers,
+                "recommendations": status_report.get('recommendations', []),
+                "can_proceed_to_analysis": status_report.get('can_proceed_to_analysis', False)
+            }
             
-        except ImportedDataAnalysisMetadata.DoesNotExist:
+            # Use the same serializer as temporary file validation
+            from .serializers import TemporaryFileHeaderValidationSerializer
+            serializer = TemporaryFileHeaderValidationSerializer(response_data)
+            
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except DatasetAnalysisMetadata.DoesNotExist:
             return Response(
-                {"error": "Table analysis metadata not found"},
+                {"error": "Dataset analysis metadata not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
@@ -907,19 +1019,36 @@ class HeaderValidationView(APIView):
             )
     
     def _get_existing_validation_results(self, analysis_metadata):
-        """Get existing validation results for a table"""
-        results = {}
+        """Get existing validation results for a table in the expected format"""
+        from .services.header_validator import HeaderValidatorConfig
+        
+        # Get column definitions to know which are required vs optional
+        config = HeaderValidatorConfig()
+        required_defs = config.get_required_definitions()
+        optional_defs = config.get_optional_definitions()
+        
         validations = analysis_metadata.header_validations.all()
         
+        required_columns = {}
+        optional_columns = {}
+        
         for validation in validations:
-            results[validation.header_type] = {
+            validation_data = {
                 'matched_column': validation.matched_column,
                 'confidence_score': validation.confidence_score,
                 'is_found': validation.is_found,
                 'validation_method': validation.validation_method
             }
+            
+            if validation.header_type in required_defs:
+                required_columns[validation.header_type] = validation_data
+            elif validation.header_type in optional_defs:
+                optional_columns[validation.header_type] = validation_data
         
-        return results
+        return {
+            'required_columns': required_columns,
+            'optional_columns': optional_columns
+        }
     
     def _get_validation_summary(self, analysis_metadata):
         """Get validation summary for a table"""
@@ -946,22 +1075,22 @@ class HeaderValidationView(APIView):
         }
 
 class GenerateInsightsView(APIView):
-    """Generate insights for a validated table"""
+    """Generate insights for a validated dataset"""
     permission_classes = [IsAuthenticated]
     
-    def post(self, request, table_id):
-        from .models import ImportedDataAnalysisMetadata
+    def post(self, request, dataset_id):
+        from .models import DatasetAnalysisMetadata
         
         try:
-            analysis_metadata = ImportedDataAnalysisMetadata.objects.get(
-                id=table_id,
-                user=request.user
+            analysis_metadata = DatasetAnalysisMetadata.objects.get(
+                id=dataset_id,
+                dataset__user=request.user
             )
             
-            # Check if table is validated and all headers found
-            if not analysis_metadata.is_validated:
+            # Check if dataset is validated and all headers found
+            if not analysis_metadata.is_analysis_ready:
                 return Response({
-                    "error": "Table headers must be validated before generating insights"
+                    "error": "Dataset headers must be validated before generating insights"
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             found_headers = analysis_metadata.header_validations.filter(is_found=True).count()
@@ -974,92 +1103,31 @@ class GenerateInsightsView(APIView):
             # For now, return a placeholder response
             return Response({
                 "message": "Insights generation is not yet implemented",
-                "table_id": table_id,
-                "redirect_url": f"/feature/analyse-data/{table_id}/insights/"
+                "dataset_id": dataset_id,
+                "redirect_url": f"/feature/analyse-data/{dataset_id}/insights/"
             }, status=status.HTTP_200_OK)
             
-        except ImportedDataAnalysisMetadata.DoesNotExist:
+        except DatasetAnalysisMetadata.DoesNotExist:
             return Response(
-                {"error": "Table analysis metadata not found"},
+                {"error": "Dataset analysis metadata not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
 
-class CreateImportedDataAnalysisMetadataView(APIView):
-    """Create table analysis metadata from a user data table"""
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request):
-        from .models import ImportedDataMetadata, ImportedDataAnalysisMetadata
-        from .serializers import ImportedDataAnalysisMetadataSerializer
-        
-        try:
-            data_table_id = request.data.get('data_table_id')
-            
-            if not data_table_id:
-                return Response(
-                    {"error": "data_table_id is required"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Get the user data table
-            user_data_table = ImportedDataMetadata.objects.get(
-                id=data_table_id,
-                user=request.user,
-                import_status='completed'
-            )
-            
-            # Check if analysis metadata already exists
-            if ImportedDataAnalysisMetadata.objects.filter(user_data_table=user_data_table).exists():
-                return Response(
-                    {"error": "Table analysis metadata already exists for this data table"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Create analysis metadata
-            analysis_metadata = ImportedDataAnalysisMetadata.objects.create(
-                user=request.user,
-                user_data_table=user_data_table,
-                display_name=user_data_table.display_name,
-                file_path=user_data_table.processed_upload.processed_file_path,
-                file_size=user_data_table.processed_upload.file_size,
-                row_count=user_data_table.total_rows,
-                headers=list(user_data_table.selected_columns)
-            )
-            
-            serializer = ImportedDataAnalysisMetadataSerializer(analysis_metadata)
-            
-            return Response({
-                "message": "Table analysis metadata created successfully",
-                "table_analysis_metadata": serializer.data
-            }, status=status.HTTP_201_CREATED)
-            
-        except ImportedDataMetadata.DoesNotExist:
-            return Response(
-                {"error": "User data table not found or not completed"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to create table analysis metadata: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 
-class ImportedDataAnalysisMetadataPreviewView(APIView):
-    """Get preview data for table analysis metadata"""
+class DatasetPreviewView(APIView):
+    """Get preview data for a dataset"""
     permission_classes = [IsAuthenticated]
     
-    def get(self, request, table_id):
-        from .models import ImportedDataAnalysisMetadata
+    def get(self, request, dataset_id):
+        from .models import UserDataset
         from django.db import connection
         
         try:
-            analysis_metadata = ImportedDataAnalysisMetadata.objects.get(
-                id=table_id,
-                user=request.user
+            dataset = UserDataset.objects.get(
+                id=dataset_id,
+                user=request.user,
+                status='active'
             )
-            
-            # Get the actual table name from the linked ImportedDataMetadata
-            table_name = analysis_metadata.user_data_table.table_name
             
             # Get limit from query params (default 5 for preview)
             limit = min(int(request.GET.get('limit', 5)), 100)  # Max 100 rows
@@ -1071,9 +1139,9 @@ class ImportedDataAnalysisMetadataPreviewView(APIView):
                     SELECT column_name
                     FROM information_schema.columns
                     WHERE table_name = %s
-                    AND column_name NOT IN ('id', 'created_at', 'updated_at')
+                    AND column_name NOT IN ('__sys_id', '__sys_created_at', '__sys_updated_at')
                     ORDER BY ordinal_position
-                ''', [table_name])
+                ''', [dataset.table_name])
                 
                 columns = [row[0] for row in cursor.fetchall()]
                 
@@ -1088,8 +1156,8 @@ class ImportedDataAnalysisMetadataPreviewView(APIView):
                 columns_sql = ', '.join(f'"{col}"' for col in columns)
                 cursor.execute(f'''
                     SELECT {columns_sql}
-                    FROM "{table_name}"
-                    ORDER BY id
+                    FROM "{dataset.table_name}"
+                    ORDER BY "__sys_id"
                     LIMIT %s
                 ''', [limit])
                 
@@ -1104,22 +1172,98 @@ class ImportedDataAnalysisMetadataPreviewView(APIView):
                     preview_data.append(row_dict)
                 
                 # Get total row count
-                cursor.execute(f'SELECT COUNT(*) FROM "{table_name}"')
+                cursor.execute(f'SELECT COUNT(*) FROM "{dataset.table_name}"')
                 total_rows = cursor.fetchone()[0]
             
             return Response({
                 'preview_data': preview_data,
                 'columns': columns,
-                'total_rows': total_rows
+                'total_rows': total_rows,
+                'dataset_name': dataset.name
             }, status=status.HTTP_200_OK)
             
-        except ImportedDataAnalysisMetadata.DoesNotExist:
+        except UserDataset.DoesNotExist:
             return Response(
-                {"error": "Table analysis metadata not found"},
+                {"error": "Dataset not found or not active"},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
             return Response(
                 {"error": f"Failed to fetch preview data: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class GenerateInsightsAnalysisView(APIView):
+    """Generate insights for a dataset using the insight engine"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, dataset_id):
+        from .models import DatasetAnalysisMetadata
+        from .services.insight_engine import create_insight_engine
+        from .serializers import InsightEngineResultSerializer
+        
+        try:
+            analysis_metadata = DatasetAnalysisMetadata.objects.get(
+                id=dataset_id,
+                dataset__user=request.user
+            )
+            
+            # Check if headers are validated
+            if not analysis_metadata.is_analysis_ready:
+                return Response({
+                    "error": "Dataset headers must be validated before generating insights"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Create insight engine and analyze dataset
+            insight_engine = create_insight_engine()
+            result = insight_engine.analyze_dataset(
+                dataset_id=str(analysis_metadata.id),
+                table_name=analysis_metadata.dataset.table_name,
+                selected_columns=list(analysis_metadata.dataset.selected_columns)
+            )
+            
+            # Serialize the result
+            serializer = InsightEngineResultSerializer(result)
+            
+            return Response({
+                "success": True,
+                "insight_analysis": serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except DatasetAnalysisMetadata.DoesNotExist:
+            return Response(
+                {"error": "Dataset analysis metadata not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Insight generation failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class GetInsightsStatusView(APIView):
+    """Get status of insight generation for a dataset"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, dataset_id):
+        from .models import DatasetAnalysisMetadata
+        from .serializers import DatasetAnalysisMetadataSerializer
+        
+        try:
+            analysis_metadata = DatasetAnalysisMetadata.objects.get(
+                id=dataset_id,
+                dataset__user=request.user
+            )
+            
+            serializer = DatasetAnalysisMetadataSerializer(analysis_metadata)
+            
+            return Response({
+                "success": True,
+                "dataset": serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except DatasetAnalysisMetadata.DoesNotExist:
+            return Response(
+                {"error": "Dataset analysis metadata not found"},
+                status=status.HTTP_404_NOT_FOUND
             )

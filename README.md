@@ -1,6 +1,69 @@
 # VRose Project Documentation
 
-## 1. Development Setup & Commands
+## 1. Task Management
+
+### ✅ Completed Tasks
+- ✅ Admin panel; users and features
+- ✅ Form validation with CSRF protection
+- ✅ Access and refresh token implementation
+- ✅ Logout API fix
+- ✅ Auth bar moved to top navigation
+- ✅ Theme switcher implementation
+- ✅ Login auto-fill 400 error fix
+- ✅ TopBar added to signup/login pages
+- ✅ Redux state manager integration
+- ✅ Tree hydration error fix
+- ✅ CSRF token validation
+- ✅ Custom font support (DN-Sans)
+- ✅ Keyword removal from signup/models
+- ✅ Dashboard feature permissions
+- ✅ Dashboard features table & admin panel
+- ✅ Signup form width restriction fix
+- ✅ Horizontal navigation bar implementation
+- ✅ Logout redirect and auth state fix
+- ✅ Color scheme consistency
+- ✅ Enhanced signup flow (email → continue/Google options → form)
+- ✅ Dashboard configuration (flex grid, API-driven features, icons, permissions)
+- ✅ Adjust logging for the pgadmin docker image
+- ✅ Google auth
+- ✅ Permission based access for features
+
+### 📋 Pending Tasks
+- Homepage visual improvements
+- VRose logo design with animation
+- Welcome message enhancement
+- Improve font and texture of ui
+- 'Go to dashboard' button aesthetics
+- Dashboard button can replace the sign in button once auth'd
+- Expired token login handling
+- Feature access control for insufficient permissions
+- Feature list page
+- Pricing page implementation
+- Support page creation
+- Mobile responsive sizing
+- SVG theme-based coloring
+- Legacy behavior error resolution
+- Signup form validation (disable until complete) ???
+- Edit file name during file upload
+- Find incorrect SQL queries referring to legacy model names.
+- Adjust logging for the pgadmin docker image
+- Adjust sign up serializer to set permissions accordingly, not access_all
+- Fix refresh token api endpoint not working correctly for google auth
+- Repair import progress widget
+- Ensure header validation logic is future proof
+- Check header validation on temporary upload, report to user
+- Render status of header validations on the upload page
+- Now analyse dataset widget just needs 'generate insights' and 'delete'
+- Fix 'delete' endpoint not hooking all the dataset records
+- Create validate headers for file preview
+- Show validate headers results on analyse data screen
+- Make validate headers much stricter
+- Generate insights renders a graph
+- Generate insights deploys a tensorflow model for sales analysis (LSTM)
+- User can modify the graph
+- User can view prediction
+
+## 2. Development Setup & Commands
 
 ### Initial Setup
 **Git Configuration:**
@@ -12,13 +75,8 @@
 - Windows: `python -m venv venv` → `venv/Scripts/activate`
 
 **Docker Configuration:**
-- Initial build: `docker-compose up --build`
+- Initial build: `docker-compose -f docker.compose.dev.yml up --build`
 - Standard run: `docker-compose up`
-
-**Development Mode (Hot Reloading):**
-- Database only: `docker-compose start db`
-- Backend: `python manage.py runserver`
-- Frontend: `npm run dev` (from frontend directory)
 
 **Git Workflow:**
 - Stage changes: `git add .`
@@ -27,7 +85,7 @@
 
 ---
 
-## 2. Project Roadmap & Progress
+## 3. Project Roadmap & Progress
 
 ### ✅ Completed Stages
 
@@ -87,57 +145,3 @@
 - SSL, domain, and monitoring configuration
 
 ---
-
-## 3. Task Management
-
-### ✅ Completed Tasks
-- ✅ Keyword admin portal
-- ✅ Form validation with CSRF protection
-- ✅ Access and refresh token implementation
-- ✅ Logout API fix
-- ✅ Auth bar moved to top navigation
-- ✅ Theme switcher implementation
-- ✅ Login auto-fill 400 error fix
-- ✅ TopBar added to signup/login pages
-- ✅ Redux state manager integration
-- ✅ Tree hydration error fix
-- ✅ CSRF token validation
-- ✅ Custom font support (DN-Sans)
-- ✅ Keyword removal from signup/models
-- ✅ Dashboard feature permissions
-- ✅ Dashboard features table & admin panel
-- ✅ Signup form width restriction fix
-- ✅ Horizontal navigation bar implementation
-- ✅ Logout redirect and auth state fix
-- ✅ Color scheme consistency
-- ✅ Enhanced signup flow (email → continue/Google options → form)
-- ✅ Dashboard configuration (flex grid, API-driven features, icons, permissions)
-
-### 🚧 In Progress Tasks
-- 🚧 Homepage visual improvements
-- 🚧 VRose logo design
-- 🚧 Welcome message enhancement
-- 🚧 'Go to dashboard' button aesthetics
-- 🚧 Expired token login handling
-- 🚧 Google signup integration
-- 🚧 Feature access control for insufficient permissions
-
-### 📋 Pending Tasks
-- Feature list page
-- Pricing page implementation
-- Support page creation
-- Relative imports conversion
-- Typewriter effect for welcome message
-- Mobile responsive sizing
-- Product-based permission system
-- SVG theme-based coloring
-- Legacy behavior error resolution
-- Signup form validation (disable until complete) ???
-- Edit file name in file preview.
-- Find incorrect SQL queries referring to legacy model names.
-- Adjust logging for the pgadmin docker image
-
-### 🎯 Current Sprint Focus
-**Priority 1:** Complete Stage Three refinements
-**Priority 2:** Begin Stage Four (Data Visualization)
-**Priority 3:** Resolve in-progress UI/UX tasks

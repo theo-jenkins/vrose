@@ -49,16 +49,28 @@ const TopBar: React.FC = () => {
                     {/* Theme Switcher */}
                     <ThemeSwitcher />
 
+                    {/* Go to dashboard button */}
+                    
+
                     {/* Authentication Buttons */}
                     {isAuthenticated ? (
-                        <button
-                            onClick={handleLogout}
-                            disabled={isLoggingOut}
-                            className="font-semibold shadow-custom-light dark:shadow-custom-dark
-                                        text-light-text dark:text-dark-text px-2 py-1 rounded-md 
-                                        hover:scale-110 transition-all duration-300">
-                            {isLoggingOut ? 'Signing Out...' : 'Sign Out'}
-                        </button>
+                        <>
+                            <Link href="/dashboard">
+                                <button className="font-semibold shadow-custom-light dark:shadow-custom-dark
+                                            text-light-text dark:text-dark-text px-2 py-1 rounded-md 
+                                            hover:scale-110 transition-all duration-300">
+                                            Dashboard
+                                </button>
+                            </Link>
+                            <button
+                                onClick={handleLogout}
+                                disabled={isLoggingOut}
+                                className="font-semibold shadow-custom-light dark:shadow-custom-dark
+                                            text-light-text dark:text-dark-text px-2 py-1 rounded-md 
+                                            hover:scale-110 transition-all duration-300">
+                                {isLoggingOut ? 'Signing Out...' : 'Sign Out'}
+                            </button>
+                        </>
                     ) : (
                         <>
                             {currentPage !== '/auth/signin' && (

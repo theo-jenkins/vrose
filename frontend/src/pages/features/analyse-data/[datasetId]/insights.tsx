@@ -8,7 +8,7 @@ import { ChartBarIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outli
 
 const InsightsPage: React.FC = () => {
   const router = useRouter();
-  const { tableId } = router.query;
+  const { datasetId } = router.query;
   const { isAuthenticated, isInitialized } = useSelector((state: RootState) => state.auth);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,17 +22,17 @@ const InsightsPage: React.FC = () => {
   }, [isAuthenticated, isInitialized, router]);
 
   useEffect(() => {
-    if (tableId && typeof tableId === 'string') {
+    if (datasetId && typeof datasetId === 'string') {
       fetchTableData();
     }
-  }, [tableId]);
+  }, [datasetId]);
 
   const fetchTableData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const tableData = await analyseDataService.getSavedTableDetail(tableId as string);
+      const tableData = await analyseDataService.getDatasetAnalysisDetail(datasetId as string);
       setTable(tableData);
     } catch (err) {
       console.error('Error fetching table data:', err);
@@ -106,7 +106,7 @@ const InsightsPage: React.FC = () => {
               <ChartBarIcon className="h-8 w-8 text-blue-600 mr-3" />
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">
-                  {table?.display_name} - Insights
+                  {table?.dataset_name} - Insights
                 </h1>
                 <p className="mt-2 text-gray-600">
                   Data analysis and insights for your table

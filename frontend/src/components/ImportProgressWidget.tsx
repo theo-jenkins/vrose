@@ -26,6 +26,7 @@ const ImportProgressWidget: React.FC<ImportProgressWidgetProps> = ({
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const [isExpanded, setIsExpanded] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
+  const [startTime, setStartTime] = useState<number | null>(null);
   
   // Use refs to store callback functions to prevent useEffect dependency issues
   const onCompleteRef = useRef(onComplete);
@@ -48,13 +49,31 @@ const ImportProgressWidget: React.FC<ImportProgressWidgetProps> = ({
       
       // Handle completion
       if (progressData.status === 'completed') {
-        if (onCompleteRef.current) {
-          onCompleteRef.current(taskId);
-        }
-        // Auto-hide after 5 seconds
+        // Delay the completion callback to allow the widget to render first
         setTimeout(() => {
-          setIsVisible(false);
-        }, 5000);
+          if (onCompleteRef.current) {
+            onCompleteRef.current(taskId);
+          }
+        }, 3000); // Wait 3 seconds before calling completion
+        
+        // Ensure minimum display time of 3 seconds, then auto-hide after additional 5 seconds
+        const currentTime = Date.now();
+        const elapsedTime = startTime ? currentTime - startTime : 0;
+        const minDisplayTime = 3000; // 3 seconds minimum
+        const additionalDisplayTime = 5000; // 5 seconds additional
+        
+        if (elapsedTime < minDisplayTime) {
+          // Still need to show more time to reach minimum
+          setTimeout(() => {
+            setIsVisible(false);
+          }, minDisplayTime - elapsedTime + additionalDisplayTime);
+        } else {
+          // Already shown long enough, just show for additional time
+          setTimeout(() => {
+            setIsVisible(false);
+          }, additionalDisplayTime);
+        }
+        
         return false; // Stop polling
       }
       
@@ -69,17 +88,17 @@ const ImportProgressWidget: React.FC<ImportProgressWidgetProps> = ({
       return true; // Continue polling for pending/processing status
       
     } catch (error) {
-      console.error('Error fetching import progress:', error);
       if (onErrorRef.current) {
         onErrorRef.current(taskId, 'Failed to fetch progress');
       }
       return false; // Stop polling on API error
     }
-  }, [taskId]); // Remove onComplete and onError from dependencies
+  }, [taskId]);
 
   useEffect(() => {
     if (taskId) {
       setIsVisible(true);
+      setStartTime(Date.now());
       
       let intervalId: NodeJS.Timeout;
       
@@ -108,7 +127,7 @@ const ImportProgressWidget: React.FC<ImportProgressWidgetProps> = ({
     } else {
       setIsVisible(false);
     }
-  }, [taskId, fetchProgress]);
+  }, [taskId]); // Removed fetchProgress from dependencies
 
   const handleClose = () => {
     setIsVisible(false);
@@ -217,7 +236,7 @@ const ImportProgressWidget: React.FC<ImportProgressWidgetProps> = ({
         {isExpanded && (
           <div className="px-4 pb-4">
             {/* Progress Bar */}
-            {progress.status === 'processing' && (
+            {(progress.status === 'processing' || progress.status === 'completed') && (
               <div className="mb-3">
                 <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
                   <span>{progress.current} of {progress.total}</span>
@@ -225,7 +244,9 @@ const ImportProgressWidget: React.FC<ImportProgressWidgetProps> = ({
                 </div>
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                   <div
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      progress.status === 'completed' ? 'bg-green-600' : 'bg-blue-600'
+                    }`}
                     style={{ width: `${progress.percentage}%` }}
                   ></div>
                 </div>

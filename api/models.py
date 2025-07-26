@@ -57,18 +57,12 @@ class CustomUser(AbstractUser):
     
 # Dashboard feature model
 class DashboardFeature(models.Model):
-    # Unique identifier for each feature
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    # Internal reference key ('upload_file')
-    key = models.CharField(max_length=100, unique=True)
-    # Display name shown to users ('Upload File')
-    title = models.CharField(max_length=100)
-    # URL path for when a feature is clicked ('/upload-file/')
-    route = models.CharField(max_length=100)
-    # File name for icon ('upload_file_icon.svg')
-    icon = models.CharField(max_length=100, blank=True, null=True)
-    # Permission required to access this feature (defined in CustomUser model)
-    permission_code = models.CharField(max_length=100, blank=True, null=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False) # Unique identifier for each feature
+    key = models.CharField(max_length=100, unique=True) # Internal reference key ('upload_file')
+    title = models.CharField(max_length=100) # Display name shown to users ('Upload File')
+    route = models.CharField(max_length=100) # URL path for when a feature is clicked ('/upload-file/')
+    icon = models.CharField(max_length=100, blank=True, null=True) # File name for icon ('upload_file_icon.svg')
+    permission_code = models.CharField(max_length=100, blank=True, null=True) # Permission required to access this feature (defined in CustomUser model)
 
     def __str__(self):
         return self.title
@@ -83,7 +77,7 @@ class TemporaryUpload(models.Model):
         ('failed', 'Failed'),
         ('expired', 'Expired'),
     ]
-    
+    # Metadata
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     original_filename = models.CharField(max_length=255)
@@ -96,6 +90,7 @@ class TemporaryUpload(models.Model):
     preview_data = models.JSONField(null=True, blank=True)
     validation_errors = models.JSONField(null=True, blank=True)  # Store any validation issues
     
+    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()  # 1 hour expiry
     confirmed_at = models.DateTimeField(null=True, blank=True)
@@ -103,91 +98,63 @@ class TemporaryUpload(models.Model):
     def __str__(self):
         return f"{self.original_filename} - {self.user.email}"
 
-# Processed file upload model for confirmed and processed files
-class ProcessedUpload(models.Model):
-    PROCESSING_STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('processing', 'Processing'),
-        ('completed', 'Completed'),
+# Core asset for users datasets, consolidated model combining legacy ProcessedUpload and ImportedDataMetadata models
+class UserDataset(models.Model):
+    STATUS_CHOICES = [
+        ('importing', 'Importing'),
+        ('active', 'Active'),
         ('failed', 'Failed'),
+        ('archived', 'Archived'),
     ]
     
+    # Identity fields
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    temporary_upload = models.OneToOneField(TemporaryUpload, on_delete=models.CASCADE, null=True, blank=True)
+    temporary_upload = models.OneToOneField(TemporaryUpload, on_delete=models.SET_NULL, null=True, blank=True)
     
-    original_filename = models.CharField(max_length=255)
-    processed_file_path = models.CharField(max_length=500)  # Path to processed/stored file
-    file_size = models.BigIntegerField()
-    file_type = models.CharField(max_length=50)
+    # Dataset Information (user-facing)
+    name = models.CharField(max_length=255)  # User-friendly dataset name
+    original_filename = models.CharField(max_length=255)  # From original upload
     
-    # Processing metadata
-    processing_status = models.CharField(max_length=20, choices=PROCESSING_STATUS_CHOICES, default='pending')
-    row_count = models.IntegerField(null=True, blank=True)
-    column_count = models.IntegerField(null=True, blank=True)
-    processing_errors = models.JSONField(null=True, blank=True)
-    
-    # Celery task tracking
-    celery_task_id = models.CharField(max_length=255, null=True, blank=True)
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    processed_at = models.DateTimeField(null=True, blank=True)
-    
-    def __str__(self):
-        return f"Processed: {self.original_filename} - {self.user.email}"
-
-# Dynamic user data tables for imported data
-class ImportedDataMetadata(models.Model):
-    IMPORT_STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('processing', 'Processing'),
-        ('completed', 'Completed'),
-        ('failed', 'Failed'),
-        ('cancelled', 'Cancelled'),
-    ]
-    
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    processed_upload = models.OneToOneField(ProcessedUpload, on_delete=models.CASCADE)
-    
-    # Table information
-    table_name = models.CharField(max_length=255, unique=True)
-    display_name = models.CharField(max_length=255)
-    
-    # Column information
+    # Table Management
+    table_name = models.CharField(max_length=255, unique=True)  # Database table name
     selected_columns = models.JSONField()  # List of selected column names
-    column_mapping = models.JSONField()    # Original column names -> cleaned names mapping
-    column_types = models.JSONField()      # Column name -> detected data type mapping
+    column_mapping = models.JSONField()  # Original → cleaned column name mapping
+    column_types = models.JSONField()  # Column → data type mapping
     
-    # Import progress tracking
-    import_status = models.CharField(max_length=20, choices=IMPORT_STATUS_CHOICES, default='pending')
+    # Data Metrics
     total_rows = models.IntegerField(null=True, blank=True)
-    processed_rows = models.IntegerField(default=0)
+    file_size = models.BigIntegerField()
+    file_type = models.CharField(max_length=50)  # csv, xlsx, xls
     
-    # Task tracking
+    # Status & Progress
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='importing')
+    
+    # Task Tracking
     celery_task_id = models.CharField(max_length=255, null=True, blank=True)
+    error_details = models.JSONField(null=True, blank=True)  # Detailed error information
     
-    # Metadata
+    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-    error_message = models.TextField(null=True, blank=True)
+    imported_at = models.DateTimeField(null=True, blank=True)  # When import completed
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'status']),
+            models.Index(fields=['table_name']),
+        ]
     
     def __str__(self):
-        return f"{self.display_name} - {self.user.email}"
-    
-    @property
-    def progress_percentage(self):
-        if not self.total_rows or self.total_rows == 0:
-            return 0
-        return min(100, round((self.processed_rows / self.total_rows) * 100, 1))
+        return f"{self.name} - {self.user.email}"
     
     def generate_table_name(self):
-        """Generate unique table name for this import"""
+        """Generate unique table name for this dataset"""
         import re
         from django.utils import timezone
         
         # Clean filename for use in table name
-        clean_filename = re.sub(r'[^a-zA-Z0-9_]', '_', self.processed_upload.original_filename)
+        clean_filename = re.sub(r'[^a-zA-Z0-9_]', '_', self.original_filename)
         clean_filename = re.sub(r'_+', '_', clean_filename).strip('_')
         
         # Remove file extension
@@ -198,14 +165,14 @@ class ImportedDataMetadata(models.Model):
         timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
         
         # Generate table name
-        table_name = f"user_{self.user.id}_{clean_filename}_{timestamp}"
+        table_name = f"user_{str(self.user.id)}_{clean_filename}_{timestamp}"
 
         # Replace hyphens
         table_name = table_name.replace('-', '_')
         
         # Ensure it's not too long (PostgreSQL limit is 63 characters)
         if len(table_name) > 60:
-            table_name = f"user_{self.user.id}_{timestamp}"
+            table_name = f"user_{str(self.user.id)}_{timestamp}"
         
         return table_name.lower()
 
@@ -218,10 +185,10 @@ class ImportTask(models.Model):
         ('failed', 'Failed'),
         ('cancelled', 'Cancelled'),
     ]
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    data_table = models.ForeignKey(ImportedDataMetadata, on_delete=models.CASCADE)
+    dataset = models.ForeignKey(UserDataset, on_delete=models.CASCADE, related_name='import_tasks')
     
     # Task information
     celery_task_id = models.CharField(max_length=255, unique=True)
@@ -247,30 +214,31 @@ class ImportTask(models.Model):
     
     @property
     def progress_percentage(self):
-        if not self.total_steps or self.total_steps == 0:
+        """Calculate progress percentage based on current and total steps"""
+        if self.total_steps == 0:
             return 0
-        return min(100, round((self.current_step / self.total_steps) * 100, 1))
+        return min(100, round((self.current_step / self.total_steps) * 100, 2))
 
-# Table analysis metadata model for analysis feature
-class ImportedDataAnalysisMetadata(models.Model):
+
+# Dataset analysis metadata model for analysis feature
+class DatasetAnalysisMetadata(models.Model):
+    # Core relationship
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    user_data_table = models.OneToOneField(ImportedDataMetadata, on_delete=models.CASCADE)
+    dataset = models.OneToOneField(UserDataset, on_delete=models.CASCADE, related_name='analysis')
     
-    # Table metadata
-    display_name = models.CharField(max_length=255)
-    file_path = models.CharField(max_length=500)
-    file_size = models.BigIntegerField()
-    row_count = models.IntegerField()
+    # Analysis readiness
+    is_analysis_ready = models.BooleanField(default=False)
+    analysis_validated_at = models.DateTimeField(null=True, blank=True)
     
-    # Header information
-    headers = models.JSONField()  # List of column headers
+    # Header validation results
+    required_columns_found = models.JSONField(default=dict)
+    optional_columns_found = models.JSONField(default=dict)
     
-    # Validation status
-    is_validated = models.BooleanField(default=False)
-    validation_completed_at = models.DateTimeField(null=True, blank=True)
+    # Analysis tracking
+    insights_generated = models.BooleanField(default=False)
+    last_analysis_run = models.DateTimeField(null=True, blank=True)
     
-    # Metadata
+    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -278,7 +246,7 @@ class ImportedDataAnalysisMetadata(models.Model):
         ordering = ['-created_at']
     
     def __str__(self):
-        return f"{self.display_name} - {self.user.email}"
+        return f"Analysis: {self.dataset.name}"
 
 # Header validation results model
 class HeaderValidation(models.Model):
@@ -290,7 +258,7 @@ class HeaderValidation(models.Model):
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    table_analysis_metadata = models.ForeignKey(ImportedDataAnalysisMetadata, on_delete=models.CASCADE, related_name='header_validations')
+    dataset_analysis = models.ForeignKey(DatasetAnalysisMetadata, on_delete=models.CASCADE, related_name='header_validations')
     
     # Header validation details
     header_type = models.CharField(max_length=20, choices=HEADER_TYPES)
@@ -303,8 +271,8 @@ class HeaderValidation(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
-        unique_together = ['table_analysis_metadata', 'header_type']
+        unique_together = ['dataset_analysis', 'header_type']
         ordering = ['header_type']
     
     def __str__(self):
-        return f"{self.table_analysis_metadata.display_name} - {self.header_type}: {self.matched_column}"
+        return f"{self.dataset_analysis.dataset.name} - {self.header_type}: {self.matched_column}"

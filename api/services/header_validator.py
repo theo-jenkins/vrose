@@ -119,7 +119,8 @@ class HeaderValidatorConfig:
                 name='category',
                 word_bank=[
                     'category', 'type', 'class', 'classification', 'group',
-                    'segment', 'division', 'department', 'product_category'
+                    'segment', 'division', 'department', 'product_category',
+                    'collection'
                 ],
                 is_required=False,
                 confidence_threshold=70,
@@ -202,7 +203,9 @@ class HeaderValidator:
     
     def validate_headers(self, headers: List[str]) -> Dict[str, Any]:
         """
-        Validate headers against all configured column definitions.
+        Validate headers against all configured column definitions with one-to-one matching.
+        Each user column can only be matched to one header type, prioritizing by confidence
+        and then by requirement status (required headers first).
         
         Args:
             headers: List of column header strings
@@ -219,12 +222,11 @@ class HeaderValidator:
         # Get column definitions
         required_defs = self.config.get_required_definitions()
         optional_defs = self.config.get_optional_definitions()
+        all_defs = {**required_defs, **optional_defs}
         
-        # Validate against all definitions
-        required_results = self._validate_against_definitions(
-            filtered_headers, required_defs)
-        optional_results = self._validate_against_definitions(
-            filtered_headers, optional_defs)
+        # Perform one-to-one matching
+        required_results, optional_results = self._perform_one_to_one_matching(
+            filtered_headers, required_defs, optional_defs)
         
         # Generate status report
         status_report = self._generate_status_report(
@@ -251,6 +253,102 @@ class HeaderValidator:
                 logger.debug(f"Excluded system header: {header}")
         
         return filtered
+    
+    def _perform_one_to_one_matching(self, 
+                                   headers: List[str], 
+                                   required_defs: Dict[str, ColumnDefinition],
+                                   optional_defs: Dict[str, ColumnDefinition]) -> Tuple[Dict[str, ValidationResult], Dict[str, ValidationResult]]:
+        """
+        Perform one-to-one matching where each user column can only match one header type.
+        Priority: highest confidence for required headers, then highest confidence for optional headers.
+        """
+        from collections import defaultdict
+        
+        # Step 1: Calculate all possible matches with scores
+        all_matches = []  # List of (header, header_type, confidence_score, is_required, validation_result)
+        
+        all_defs = {**required_defs, **optional_defs}
+        
+        for header_type, definition in all_defs.items():
+            is_required = header_type in required_defs
+            
+            # Find best match for this header type
+            best_result = ValidationResult(
+                matched_column=None,
+                confidence_score=0,
+                is_found=False,
+                best_match_word=None,
+                validation_method="no_match"
+            )
+            
+            # Try each strategy
+            for strategy in self.strategies:
+                result = self._validate_with_strategy(headers, definition, strategy)
+                if result.confidence_score > best_result.confidence_score:
+                    best_result = result
+            
+            # Only consider matches that meet the confidence threshold
+            if best_result.confidence_score >= definition.confidence_threshold and best_result.matched_column:
+                all_matches.append((
+                    best_result.matched_column,
+                    header_type, 
+                    best_result.confidence_score,
+                    is_required,
+                    best_result
+                ))
+        
+        # Step 2: Sort matches by priority
+        # Priority: required headers first, then by confidence score (highest first)
+        all_matches.sort(key=lambda x: (-int(x[3]), -x[2]))  # -int(is_required) for required first, -confidence for highest first
+        
+        # Step 3: Assign matches ensuring one-to-one mapping
+        used_headers = set()
+        used_header_types = set()
+        final_matches = {}
+        
+        for user_header, header_type, confidence, is_required, validation_result in all_matches:
+            # Skip if this header or header type is already matched
+            if user_header in used_headers or header_type in used_header_types:
+                continue
+            
+            # Assign this match
+            final_matches[header_type] = validation_result
+            used_headers.add(user_header)
+            used_header_types.add(header_type)
+            
+            logger.info(f"Matched '{user_header}' to '{header_type}' with {confidence}% confidence (required: {is_required})")
+        
+        # Step 4: Create results for unmatched header types
+        required_results = {}
+        optional_results = {}
+        
+        for header_type, definition in required_defs.items():
+            if header_type in final_matches:
+                required_results[header_type] = final_matches[header_type]
+            else:
+                # No match found
+                required_results[header_type] = ValidationResult(
+                    matched_column=None,
+                    confidence_score=0,
+                    is_found=False,
+                    best_match_word=None,
+                    validation_method="no_match"
+                )
+        
+        for header_type, definition in optional_defs.items():
+            if header_type in final_matches:
+                optional_results[header_type] = final_matches[header_type]
+            else:
+                # No match found
+                optional_results[header_type] = ValidationResult(
+                    matched_column=None,
+                    confidence_score=0,
+                    is_found=False,
+                    best_match_word=None,
+                    validation_method="no_match"
+                )
+        
+        return required_results, optional_results
     
     def _validate_against_definitions(self, 
                                     headers: List[str], 

@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { formatFileSize } from '../utils/fileValidation';
 import { addGlobalImport } from './GlobalImportProgress';
+import HeaderValidation from './HeaderValidation';
 import api from '../services/api';
 
 interface FilePreviewData {
@@ -9,6 +10,7 @@ interface FilePreviewData {
   total_rows_sample: number;
   total_columns: number;
 }
+
 
 interface TemporaryUpload {
   id: string;
@@ -41,6 +43,12 @@ const FilePreview: React.FC<FilePreviewProps> = ({
   const [selectedColumns, setSelectedColumns] = useState<Set<string>>(
     new Set(upload.preview_data?.columns || [])
   );
+  const [datasetName, setDatasetName] = useState<string>(
+    upload.original_filename.replace(/\.[^/.]+$/, '') // Remove file extension for default name
+  );
+
+  // Memoize the selected columns array to prevent unnecessary re-renders
+  const selectedColumnsArray = useMemo(() => Array.from(selectedColumns), [selectedColumns]);
 
   const toggleColumn = useCallback((column: string) => {
     setSelectedColumns(prev => {
@@ -70,12 +78,20 @@ const FilePreview: React.FC<FilePreviewProps> = ({
       return;
     }
 
+    if (!datasetName.trim()) {
+      if (onError) {
+        onError('Please provide a dataset name.');
+      }
+      return;
+    }
+
     setIsConfirming(true);
     try {
       const selectedColumnsArray = Array.from(selectedColumns);
       
-      // Call the new column selection API endpoint
-      const response = await api.post(`/features/upload-file/select-columns/${upload.id}/`, {
+      // Call the new consolidated confirm upload API endpoint
+      const response = await api.post(`/features/upload-file/confirm/${upload.id}/`, {
+        name: datasetName.trim(),
         selected_columns: selectedColumnsArray
       });
       
@@ -146,6 +162,13 @@ const FilePreview: React.FC<FilePreviewProps> = ({
         </div>
       </div>
 
+      {/* Header Validation */}
+      <HeaderValidation 
+        tempFileId={upload.id}
+        selectedColumns={selectedColumnsArray}
+        autoValidate={true}
+      />
+
       {/* Validation Errors */}
       {upload.validation_errors && upload.validation_errors.length > 0 && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
@@ -159,6 +182,25 @@ const FilePreview: React.FC<FilePreviewProps> = ({
           </ul>
         </div>
       )}
+
+      {/* Dataset Name Input */}
+      <div>
+        <label htmlFor="dataset-name" className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+          Dataset Name
+        </label>
+        <input
+          id="dataset-name"
+          type="text"
+          value={datasetName}
+          onChange={(e) => setDatasetName(e.target.value)}
+          placeholder="Enter a name for this dataset..."
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-light-text dark:text-dark-text placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-light-primary-button dark:focus:ring-dark-primary-button focus:border-transparent"
+          disabled={isConfirming || isDiscarding}
+        />
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          This name will be used to identify your dataset in the system.
+        </p>
+      </div>
 
       {/* Column Selection */}
       {upload.preview_data && (
@@ -284,10 +326,10 @@ const FilePreview: React.FC<FilePreviewProps> = ({
           
           <button
             onClick={handleConfirm}
-            disabled={isConfirming || isDiscarding || selectedColumns.size === 0}
+            disabled={isConfirming || isDiscarding || selectedColumns.size === 0 || !datasetName.trim()}
             className="px-4 py-2 text-sm font-medium text-white bg-light-primary-button dark:bg-dark-primary-button rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isConfirming ? 'Starting Import...' : `Import ${selectedColumns.size} Column${selectedColumns.size !== 1 ? 's' : ''}`}
+            {isConfirming ? 'Creating Dataset...' : `Create Dataset with ${selectedColumns.size} Column${selectedColumns.size !== 1 ? 's' : ''}`}
           </button>
         </div>
       </div>

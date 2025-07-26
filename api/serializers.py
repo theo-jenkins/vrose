@@ -1,9 +1,9 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.models import Permission
-from .models import CustomUser, TemporaryUpload, ProcessedUpload, ImportedDataMetadata, ImportTask, ImportedDataAnalysisMetadata, HeaderValidation
+from .models import CustomUser, TemporaryUpload, UserDataset, ImportTask, DatasetAnalysisMetadata, HeaderValidation
 
-# Serializer converting a custom usre model object to JSON
+# Serializer converting a custom user model object to JSON
 class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
@@ -83,18 +83,21 @@ class TemporaryUploadSerializer(serializers.ModelSerializer):
     def get_file_size_mb(self, obj):
         return round(obj.file_size / (1024 * 1024), 2)
 
-class ProcessedUploadSerializer(serializers.ModelSerializer):
+class UserDatasetSerializer(serializers.ModelSerializer):
     file_size_mb = serializers.SerializerMethodField()
     temporary_upload_id = serializers.SerializerMethodField()
+    progress_percentage = serializers.ReadOnlyField()
     
     class Meta:
-        model = ProcessedUpload
+        model = UserDataset
         fields = [
-            'id', 'original_filename', 'file_size', 'file_size_mb',
-            'file_type', 'processing_status', 'row_count', 'column_count',
-            'processing_errors', 'temporary_upload_id', 'created_at', 'processed_at'
+            'id', 'name', 'original_filename', 'file_size', 'file_size_mb',
+            'file_type', 'status', 'total_rows', 'table_name',
+            'selected_columns', 'column_mapping', 'column_types',
+            'error_details', 'temporary_upload_id', 'created_at', 'imported_at',
+            'progress_percentage'
         ]
-        read_only_fields = ['id', 'created_at', 'processed_at']
+        read_only_fields = ['id', 'created_at', 'imported_at', 'table_name']
     
     def get_file_size_mb(self, obj):
         return round(obj.file_size / (1024 * 1024), 2)
@@ -123,26 +126,7 @@ class ColumnSelectionResponseSerializer(serializers.Serializer):
     selected_columns = serializers.IntegerField()
     message = serializers.CharField()
 
-# Dynamic Table Serializers
-class ImportedDataMetadataSerializer(serializers.ModelSerializer):
-    progress_percentage = serializers.ReadOnlyField()
-    file_size_mb = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = ImportedDataMetadata
-        fields = [
-            'id', 'table_name', 'display_name', 'selected_columns',
-            'column_mapping', 'column_types', 'import_status',
-            'total_rows', 'processed_rows', 'progress_percentage',
-            'created_at', 'completed_at', 'error_message', 'file_size_mb'
-        ]
-        read_only_fields = ['id', 'created_at', 'completed_at', 'progress_percentage']
-    
-    def get_file_size_mb(self, obj):
-        if obj.processed_upload:
-            return round(obj.processed_upload.file_size / (1024 * 1024), 2)
-        return 0
-
+# Task tracking serializers
 class ImportProgressSerializer(serializers.Serializer):
     task_id = serializers.UUIDField()
     status = serializers.CharField()
@@ -175,25 +159,28 @@ class HeaderValidationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at']
 
-class ImportedDataAnalysisMetadataSerializer(serializers.ModelSerializer):
+class DatasetAnalysisMetadataSerializer(serializers.ModelSerializer):
     header_validations = HeaderValidationSerializer(many=True, read_only=True)
+    dataset_name = serializers.CharField(source='dataset.name', read_only=True)
+    dataset_id = serializers.CharField(source='dataset.id', read_only=True)
     file_size_mb = serializers.SerializerMethodField()
     validation_summary = serializers.SerializerMethodField()
     
     class Meta:
-        model = ImportedDataAnalysisMetadata
+        model = DatasetAnalysisMetadata
         fields = [
-            'id', 'display_name', 'file_path', 'file_size', 'file_size_mb',
-            'row_count', 'headers', 'is_validated', 'validation_completed_at',
-            'created_at', 'updated_at', 'header_validations', 'validation_summary'
+            'id', 'dataset_id', 'dataset_name', 'is_analysis_ready', 'analysis_validated_at',
+            'required_columns_found', 'optional_columns_found', 'insights_generated',
+            'last_analysis_run', 'created_at', 'updated_at', 'header_validations', 
+            'validation_summary', 'file_size_mb'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_file_size_mb(self, obj):
-        return round(obj.file_size / (1024 * 1024), 2)
+        return round(obj.dataset.file_size / (1024 * 1024), 2)
     
     def get_validation_summary(self, obj):
-        if not obj.is_validated:
+        if not obj.is_analysis_ready:
             return None
         
         validations = obj.header_validations.all()
@@ -210,23 +197,24 @@ class ImportedDataAnalysisMetadataSerializer(serializers.ModelSerializer):
             ]
         }
 
-class ImportedDataAnalysisMetadataListSerializer(serializers.ModelSerializer):
+class DatasetAnalysisMetadataListSerializer(serializers.ModelSerializer):
+    dataset_name = serializers.CharField(source='dataset.name', read_only=True)
+    dataset_id = serializers.CharField(source='dataset.id', read_only=True)
     file_size_mb = serializers.SerializerMethodField()
     validation_summary = serializers.SerializerMethodField()
     
     class Meta:
-        model = ImportedDataAnalysisMetadata
+        model = DatasetAnalysisMetadata
         fields = [
-            'id', 'display_name', 'file_size_mb', 'row_count',
-            'is_validated', 'validation_completed_at', 'created_at',
-            'validation_summary'
+            'id', 'dataset_id', 'dataset_name', 'file_size_mb', 'is_analysis_ready',
+            'analysis_validated_at', 'created_at', 'validation_summary'
         ]
     
     def get_file_size_mb(self, obj):
-        return round(obj.file_size / (1024 * 1024), 2)
+        return round(obj.dataset.file_size / (1024 * 1024), 2)
     
     def get_validation_summary(self, obj):
-        if not obj.is_validated:
+        if not obj.is_analysis_ready:
             return None
         
         validations = obj.header_validations.all()
@@ -246,3 +234,63 @@ class HeaderValidationResponseSerializer(serializers.Serializer):
     message = serializers.CharField()
     validation_results = serializers.DictField()
     validation_summary = serializers.DictField()
+
+# ValidationResult serializer for header validation
+class ValidationResultSerializer(serializers.Serializer):
+    matched_column = serializers.CharField(allow_null=True)
+    confidence_score = serializers.IntegerField()
+    is_found = serializers.BooleanField()
+    best_match_word = serializers.CharField(allow_null=True)
+    validation_method = serializers.CharField()
+
+class TemporaryFileHeaderValidationSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    validation_status = serializers.ChoiceField(choices=['green', 'amber', 'red'])
+    validation_results = serializers.DictField()
+    headers = serializers.ListField(child=serializers.CharField())
+    recommendations = serializers.ListField(child=serializers.CharField())
+    can_proceed_to_analysis = serializers.BooleanField()
+    
+    def to_representation(self, instance):
+        """Convert ValidationResult objects to serializable format"""
+        from .services.header_validator import ValidationResult
+        
+        def serialize_validation_results(results_dict):
+            serialized = {}
+            for key, validation_result in results_dict.items():
+                if isinstance(validation_result, ValidationResult):
+                    # Convert ValidationResult dataclass to dict using our serializer
+                    serializer = ValidationResultSerializer(validation_result)
+                    serialized[key] = serializer.data
+                else:
+                    serialized[key] = validation_result
+            return serialized
+        
+        # Get the original data
+        data = super().to_representation(instance)
+        
+        # Serialize the validation results if they contain ValidationResult objects
+        if 'validation_results' in data:
+            validation_results = data['validation_results']
+            if 'required_columns' in validation_results:
+                validation_results['required_columns'] = serialize_validation_results(
+                    validation_results['required_columns']
+                )
+            if 'optional_columns' in validation_results:
+                validation_results['optional_columns'] = serialize_validation_results(
+                    validation_results['optional_columns']
+                )
+        
+        return data
+
+class InsightEngineResultSerializer(serializers.Serializer):
+    """Serializer for insight engine analysis results"""
+    status = serializers.ChoiceField(choices=['pending', 'analyzing', 'completed', 'failed'])
+    dataset_info = serializers.DictField()
+    validation_summary = serializers.DictField()
+    matched_methods = serializers.ListField()
+    selected_method = serializers.DictField(allow_null=True)
+    analysis_results = serializers.DictField(allow_null=True)
+    error_message = serializers.CharField(allow_null=True)
+    created_at = serializers.DateTimeField()
+    completed_at = serializers.DateTimeField(allow_null=True)

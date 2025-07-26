@@ -1,34 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { ImportedDataAnalysisMetadata, analyseDataService } from '../services/analyseDataService';
+import { DatasetAnalysisMetadata, analyseDataService } from '../services/analyseDataService';
 import { TableCellsIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 interface TablePreviewProps {
-  table: ImportedDataAnalysisMetadata;
+  dataset: DatasetAnalysisMetadata;
 }
 
-const TablePreview: React.FC<TablePreviewProps> = ({ table }) => {
+const TablePreview: React.FC<TablePreviewProps> = ({ dataset }) => {
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [totalRows, setTotalRows] = useState(0);
+  const [datasetName, setDatasetName] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPreviewData();
-  }, [table.id]);
+    if (dataset?.dataset_id) {
+      fetchPreviewData();
+    }
+  }, [dataset?.dataset_id]);
+
+  // Defensive check for dataset
+  if (!dataset) {
+    return (
+      <div className="flex items-center justify-center py-8 text-light-text dark:text-dark-text opacity-80">
+        <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
+        <span className="text-sm">Dataset information not available</span>
+      </div>
+    );
+  }
 
   const fetchPreviewData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await analyseDataService.getTablePreview(table.id, 5);
+      const response = await analyseDataService.getDatasetPreview(dataset.dataset_id, 5);
       setPreviewData(response.preview_data);
       setColumns(response.columns);
       setTotalRows(response.total_rows);
+      setDatasetName(response.dataset_name);
     } catch (err) {
-      console.error('Error fetching preview data:', err);
-      setError('Failed to load preview data');
+      console.error('Error fetching dataset preview data:', err);
+      setError('Failed to load dataset preview data');
     } finally {
       setLoading(false);
     }
@@ -83,7 +97,7 @@ const TablePreview: React.FC<TablePreviewProps> = ({ table }) => {
     return (
       <div className="flex items-center justify-center py-8 text-light-text dark:text-dark-text opacity-80">
         <TableCellsIcon className="h-5 w-5 mr-2" />
-        <span className="text-sm">No preview data available</span>
+        <span className="text-sm">No dataset preview data available</span>
       </div>
     );
   }
@@ -93,7 +107,7 @@ const TablePreview: React.FC<TablePreviewProps> = ({ table }) => {
       <div className="flex items-center justify-between">
         <div className="flex items-center text-light-text dark:text-dark-text">
           <TableCellsIcon className="h-5 w-5 mr-2" />
-          <span className="text-sm font-medium">Table Preview</span>
+          <span className="text-sm font-medium">Dataset Preview</span>
         </div>
         <div className="text-xs text-light-text dark:text-dark-text opacity-80">
           {columns.length} columns • {totalRows.toLocaleString()} total rows
